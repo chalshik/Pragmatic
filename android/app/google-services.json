@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "720160639395",
+    "project_id": "pragmatic-2e3e7",
+    "storage_bucket": "pragmatic-2e3e7.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:720160639395:android:b14448f0027888fe917216",
+        "android_client_info": {
+          "package_name": "com.example.pragmatic"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDTRba4I3B_rDTJNEj_w8-T5xZKeEV-95s"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
