@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../Services/AuthService.dart';
+import 'package:provider/provider.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -10,9 +11,15 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final AuthService authService = AuthService();
+  late AuthService authService;
   String email = '';
   String password = '';
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    authService = Provider.of<AuthService>(context, listen: false);
+  }
 
   @override
   Widget build(BuildContext context) {

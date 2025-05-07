@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:pragmatic/Widgets/AuthWrapper.dart';
 
 class BooksScreen extends StatelessWidget {
-  const BooksScreen({Key? key}) : super(key: key);
+  const BooksScreen({super.key});
 
   @override
   Widget build(BuildContext context) {

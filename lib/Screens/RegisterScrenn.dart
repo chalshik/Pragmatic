@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import '../Services/AuthService.dart';
+import 'package:provider/provider.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -10,12 +11,18 @@ class RegisterScreen extends StatefulWidget {
 }
 
 class _RegisterScreenState extends State<RegisterScreen> {
-  AuthService authService = AuthService();
+  late AuthService authService;
 
   // Define states for username, email, and password
   String username = '';
   String email = '';
   String password = '';
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    authService = Provider.of<AuthService>(context, listen: false);
+  }
 
   @override
   Widget build(BuildContext context) {

@@ -3,7 +3,13 @@ import 'package:pragmatic/Services/ApiService.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  final ApiService _apiService = ApiService();
+  ApiService? _apiService;
+
+  // Create ApiService lazily to avoid circular dependency
+  ApiService get apiService {
+    _apiService ??= ApiService(this);
+    return _apiService!;
+  }
 
   // Add auth state changes stream
   Stream<User?> authStateChanges() => _auth.authStateChanges();
@@ -20,10 +26,16 @@ class AuthService {
 
       // Save username to Firestore if provided
       if (user != null && username != null && username.isNotEmpty) {
-        await _apiService.registerUser(
-          firebaseUid: user.uid,
-          username: username,
-        );
+        try {
+          await apiService.registerUser(
+            firebaseUid: user.uid,
+            username: username,
+          );
+        } catch (e) {
+          // Log the error but don't fail the sign-up process
+          // The user is already created in Firebase Authentication
+          print('Error registering with API server: $e');
+        }
       }
 
       return user;

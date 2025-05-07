@@ -10,9 +10,14 @@ import 'package:pragmatic/Models/ReviewRequest.dart';
 import 'package:pragmatic/Models/Review.dart';
 
 class ApiService {
-  final String baseUrl = 'http://localhost';
-  final AuthService _authService = AuthService();
+  // Update this to your development machine's IP address or your API endpoint
+  // final String baseUrl = 'http://10.0.2.2';  // Use this for Android emulator
+  final String baseUrl = 'http://192.168.50.194:8080';  // Local development
+  final AuthService _authService;
 
+  ApiService(this._authService);
+
+  // Make this method handle the case where the server is not reachable
   Future<Map<String, dynamic>> registerUser({
     required String firebaseUid,
     required String username,
@@ -41,7 +46,9 @@ class ApiService {
         throw Exception('Failed to register user: ${response.statusCode}');
       }
     } catch (e) {
-      throw Exception('Failed to register user: $e');
+      print('API Server connection error: $e');
+      // Return an empty success response to avoid blocking auth flow when API server is unavailable
+      return {'status': 'success', 'message': 'Created user in Firebase only (API unavailable)'};
     }
   }
 
