@@ -52,7 +52,7 @@ class AuthService {
         email: email,
         password: password,
       );
-
+      print(getCurrentUserToken());
       return userCredential.user;
     } catch (e) {
       print('Error during sign in: $e');

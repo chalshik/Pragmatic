@@ -49,6 +49,8 @@ class HomeScreen extends StatelessWidget {
               icon: Icon(Icons.credit_card),
               label: 'Cards',
             ),
+            BottomNavigationBarItem(icon: Icon(Icons.settings), label: 'Settings'),
+            BottomNavigationBarItem(icon: Icon(Icons.gamepad), label: 'Game'),
           ],
           currentIndex: 0,
           onTap: (index) {
@@ -57,6 +59,10 @@ class HomeScreen extends StatelessWidget {
               Navigator.pushNamed(context, '/books');
             } else if (index == 1) {
               Navigator.pushNamed(context, '/cards');
+            }else if (index == 2) {
+              Navigator.pushNamed(context, '/settings');
+            } else if (index == 3) {
+              Navigator.pushNamed(context, '/game');
             }
           },
         ),

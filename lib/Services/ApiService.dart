@@ -12,9 +12,8 @@ import 'package:pragmatic/Models/Review.dart';
 class ApiService {
   // Update this to your development machine's IP address or your API endpoint
   // final String baseUrl = 'http://10.0.2.2';  // Use this for Android emulator
-  final String baseUrl = 'http://192.168.50.194:8080';  // Local development
+  final String baseUrl = 'https://specific-backend.onrender.com';  // Local development
   final AuthService _authService;
-
   ApiService(this._authService);
 
   // Make this method handle the case where the server is not reachable
@@ -22,8 +21,9 @@ class ApiService {
     required String firebaseUid,
     required String username,
   }) async {
+    final token = await _authService.getCurrentUserToken();
     final url = Uri.parse('$baseUrl/user/register');
-    
+    print(token);
     try {
       final response = await http.post(
         url,
@@ -57,8 +57,9 @@ class ApiService {
   }) async {
     final url = Uri.parse('$baseUrl/anki/add-deck');
     final token = await _authService.getCurrentUserToken();
+    final firebaseUid = _authService.getCurrentUserUid();
     
-    if (token == null) {
+    if (token == null || firebaseUid == null) {
       throw Exception('No authenticated user found');
     }
     
@@ -67,10 +68,10 @@ class ApiService {
         url,
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
         },
         body: jsonEncode({
           'title': title,
+          'firebaseUid': firebaseUid,
         }),
       );
 
@@ -93,8 +94,9 @@ class ApiService {
   }) async {
     final url = Uri.parse('$baseUrl/anki/delete-deck/$deckId');
     final token = await _authService.getCurrentUserToken();
+    final firebaseUid = _authService.getCurrentUserUid();
     
-    if (token == null) {
+    if (token == null || firebaseUid == null) {
       throw Exception('No authenticated user found');
     }
     
@@ -103,8 +105,10 @@ class ApiService {
         url,
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
         },
+        body: jsonEncode({
+          'firebaseUid': firebaseUid,
+        }),
       );
 
       if (response.statusCode == 200) {
@@ -124,18 +128,21 @@ class ApiService {
   Future<List<Deck>> getUserDecks() async {
     final url = Uri.parse('$baseUrl/anki/user-decks');
     final token = await _authService.getCurrentUserToken();
+    final firebaseUid = _authService.getCurrentUserUid();
     
-    if (token == null) {
+    if (token == null || firebaseUid == null) {
       throw Exception('No authenticated user found');
     }
     
     try {
-      final response = await http.get(
+      final response = await http.post(
         url,
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
         },
+        body: jsonEncode({
+          'firebaseUid': firebaseUid,
+        }),
       );
 
       if (response.statusCode == 200) {
@@ -160,8 +167,9 @@ class ApiService {
   }) async {
     final url = Uri.parse('$baseUrl/anki/add-card');
     final token = await _authService.getCurrentUserToken();
+    final firebaseUid = _authService.getCurrentUserUid();
     
-    if (token == null) {
+    if (token == null || firebaseUid == null) {
       throw Exception('No authenticated user found');
     }
     
@@ -170,12 +178,12 @@ class ApiService {
         url,
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
         },
         body: jsonEncode({
           'front': front,
           'back': back,
           'deckId': deckId,
+          'firebaseUid': firebaseUid,
           if (context != null) 'context': context,
           if (bookId != null) 'bookId': bookId,
         }),
@@ -202,8 +210,9 @@ class ApiService {
   }) async {
     final url = Uri.parse('$baseUrl/anki/delete-card/$cardId');
     final token = await _authService.getCurrentUserToken();
+    final firebaseUid = _authService.getCurrentUserUid();
     
-    if (token == null) {
+    if (token == null || firebaseUid == null) {
       throw Exception('No authenticated user found');
     }
     
@@ -212,8 +221,10 @@ class ApiService {
         url,
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
         },
+        body: jsonEncode({
+          'firebaseUid': firebaseUid,
+        }),
       );
 
       if (response.statusCode == 200) {
@@ -235,8 +246,9 @@ class ApiService {
   }) async {
     final url = Uri.parse('$baseUrl/api/books');
     final token = await _authService.getCurrentUserToken();
+    final firebaseUid = _authService.getCurrentUserUid();
     
-    if (token == null) {
+    if (token == null || firebaseUid == null) {
       throw Exception('No authenticated user found');
     }
     
@@ -245,10 +257,10 @@ class ApiService {
         url,
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
         },
         body: jsonEncode({
           'title': title,
+          'firebaseUid': firebaseUid,
         }),
       );
 
@@ -271,8 +283,9 @@ class ApiService {
   }) async {
     final url = Uri.parse('$baseUrl/api/books/$bookId');
     final token = await _authService.getCurrentUserToken();
+    final firebaseUid = _authService.getCurrentUserUid();
     
-    if (token == null) {
+    if (token == null || firebaseUid == null) {
       throw Exception('No authenticated user found');
     }
     
@@ -281,8 +294,10 @@ class ApiService {
         url,
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
         },
+        body: jsonEncode({
+          'firebaseUid': firebaseUid,
+        }),
       );
 
       if (response.statusCode == 200) {
@@ -302,18 +317,21 @@ class ApiService {
   Future<List<Book>> getUserBooks() async {
     final url = Uri.parse('$baseUrl/api/books');
     final token = await _authService.getCurrentUserToken();
+    final firebaseUid = _authService.getCurrentUserUid();
     
-    if (token == null) {
+    if (token == null || firebaseUid == null) {
       throw Exception('No authenticated user found');
     }
     
     try {
-      final response = await http.get(
+      final response = await http.post(
         url,
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
         },
+        body: jsonEncode({
+          'firebaseUid': firebaseUid,
+        }),
       );
 
       if (response.statusCode == 200) {
@@ -332,19 +350,22 @@ class ApiService {
   Future<Review> processReview(ReviewRequest request) async {
     final url = Uri.parse('$baseUrl/api/reviews');
     final token = await _authService.getCurrentUserToken();
+    final firebaseUid = _authService.getCurrentUserUid();
     
-    if (token == null) {
+    if (token == null || firebaseUid == null) {
       throw Exception('No authenticated user found');
     }
     
     try {
+      var requestData = request.toJson();
+      requestData['firebaseUid'] = firebaseUid;
+      
       final response = await http.post(
         url,
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
         },
-        body: jsonEncode(request.toJson()),
+        body: jsonEncode(requestData),
       );
 
       if (response.statusCode == 201) {
@@ -366,19 +387,22 @@ class ApiService {
   Future<TranslationResponse> getTranslation(TranslationRequest request) async {
     final url = Uri.parse('$baseUrl/translation');
     final token = await _authService.getCurrentUserToken();
+    final firebaseUid = _authService.getCurrentUserUid();
     
-    if (token == null) {
+    if (token == null || firebaseUid == null) {
       throw Exception('No authenticated user found');
     }
     
     try {
+      var requestData = request.toJson();
+      requestData['firebaseUid'] = firebaseUid;
+      
       final response = await http.post(
         url,
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
         },
-        body: jsonEncode(request.toJson()),
+        body: jsonEncode(requestData),
       );
 
       if (response.statusCode == 200) {
@@ -398,18 +422,22 @@ class ApiService {
   Future<List<Card>> getDueCardsForDeck(int deckId) async {
     final url = Uri.parse('$baseUrl/anki/due-cards/$deckId');
     final token = await _authService.getCurrentUserToken();
+    final firebaseUid = _authService.getCurrentUserUid();
     
-    if (token == null) {
+    if (token == null || firebaseUid == null) {
       throw Exception('No authenticated user found');
     }
     
     try {
-      final response = await http.get(
+      final response = await http.post(
         url,
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
         },
+        body: jsonEncode({
+          'deckId': deckId,
+          'firebaseUid': firebaseUid,
+        }),
       );
 
       if (response.statusCode == 200) {

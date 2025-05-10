@@ -3,14 +3,12 @@ import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'package:pragmatic/Services/AuthService.dart';
 import 'package:provider/provider.dart';
+import 'package:pragmatic/Screens/HomeScreen.dart';
 import 'package:pragmatic/Screens/LoginScreen.dart';
 import 'package:pragmatic/Screens/RegisterScrenn.dart';
-import 'package:pragmatic/Screens/MainTabScreen.dart';
-import 'package:pragmatic/Screens/HomeTabScreen.dart';
-import 'package:pragmatic/Screens/FlashcardsTabScreen.dart';
-import 'package:pragmatic/Screens/GameTabScreen.dart';
-import 'package:pragmatic/Screens/SettingsTabScreen.dart';
-
+import 'package:pragmatic/Screens/BooksScreen.dart';
+import 'package:pragmatic/Screens/CardsScreen.dart';
+import 'package:pragmatic/Screens/GameScreen.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
@@ -38,15 +36,14 @@ class MyApp extends StatelessWidget {
         theme: ThemeData(
           colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
         ),
-        initialRoute: '/',
+        initialRoute: '/login',
         routes: {
-          '/': (context) => const MainTabScreen(),
           '/login': (context) => const LoginScreen(),
           '/register': (context) => const RegisterScreen(),
-          '/home': (context) => const HomeTabScreen(),
-          '/flashcards': (context) => const FlashcardsTabScreen(),
-          '/game': (context) => const GameTabScreen(),
-          '/settings': (context) => const SettingsTabScreen(),
+          '/home': (context) => const HomeScreen(),
+          '/books': (context) => const BooksScreen(),
+          '/cards': (context) => const CardsScreen(),
+          '/game':(contex) => const GameScreen(),
         },
       ),
     );
