@@ -1,0 +1,5 @@
+Analyzing GameScreen.dart...                                    
+
+   info • The file name 'GameScreen.dart' isn't a lower_case_with_underscores identifier • lib/Screens/GameScreen.dart:1:1 • file_names
+
+1 issue found. (ran in 1.1s)
