@@ -6,7 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:pragmatic/Screens/HomeScreen.dart';
 import 'package:pragmatic/Screens/LoginScreen.dart';
 import 'package:pragmatic/Screens/RegisterScrenn.dart';
-import 'package:pragmatic/Screens/BooksScreen.dart';
+import 'package:pragmatic/Screens/BooksPage.dart';
 import 'package:pragmatic/Screens/CardsScreen.dart';
 import 'package:pragmatic/Screens/GameScreen.dart';
 void main() async {
@@ -41,9 +41,6 @@ class MyApp extends StatelessWidget {
           '/login': (context) => const LoginScreen(),
           '/register': (context) => const RegisterScreen(),
           '/home': (context) => const HomeScreen(),
-          '/books': (context) => const BooksScreen(),
-          '/cards': (context) => const CardsScreen(),
-          '/game':(contex) => const GameScreen(),
         },
       ),
     );
