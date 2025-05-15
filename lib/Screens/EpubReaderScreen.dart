@@ -3,6 +3,7 @@ import 'package:flutter_epub_viewer/flutter_epub_viewer.dart';
 import 'dart:io';
 import 'package:pragmatic/Models/TranslationRequest.dart';
 import 'package:pragmatic/Services/ApiService.dart';
+import 'package:pragmatic/Models/TranslationResponse.dart';
 class EpubReaderScreen extends StatefulWidget {
   final String filePath;
   final ApiService apiService;
@@ -63,10 +64,30 @@ class _EpubReaderScreenState extends State<EpubReaderScreen> {
                                 ),
                                 Padding(
                                   padding: const EdgeInsets.all(16.0),
-                                  child: Text(
-                                    widget.apiService.getTranslation(TranslationRequest(word: epubTextSelection.selectedText, destLang: "en")).toString(),
-                                    style: TextStyle(fontSize: 18),
-                                  ),
+                                  child: FutureBuilder<TranslationResponse>(
+                                    future: widget.apiService.getTranslation(TranslationRequest(word: epubTextSelection.selectedText, destLang: "en")),
+                                    builder: (context, snapshot) {
+                                      if (snapshot.connectionState == ConnectionState.waiting) {
+                                        return Center(child: CircularProgressIndicator());
+                                      } else if (snapshot.hasError) {
+                                        return Text(
+                                          'Error: ${snapshot.error}',
+                                          style: TextStyle(fontSize: 18, color: Colors.red),
+                                        );
+                                      } else if (snapshot.hasData) {
+                                        final translationResponse = snapshot.data!;
+                                        return Text(
+                                          translationResponse.getTranslationText(),
+                                          style: TextStyle(fontSize: 18),
+                                        );
+                                      } else {
+                                        return Text(
+                                          'No translation found',
+                                          style: TextStyle(fontSize: 18),
+                                        );
+                                      }
+                                    },
+                                  ),  
                                 ),
                                 // Add more dictionary or info widgets here
                               ],
