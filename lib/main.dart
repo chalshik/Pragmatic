@@ -6,9 +6,6 @@ import 'package:provider/provider.dart';
 import 'package:pragmatic/Screens/HomeScreen.dart';
 import 'package:pragmatic/Screens/LoginScreen.dart';
 import 'package:pragmatic/Screens/RegisterScrenn.dart';
-import 'package:pragmatic/Screens/BooksPage.dart';
-import 'package:pragmatic/Screens/CardsScreen.dart';
-import 'package:pragmatic/Screens/GameScreen.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   

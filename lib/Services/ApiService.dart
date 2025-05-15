@@ -74,7 +74,7 @@ class ApiService {
           'firebaseUid': firebaseUid,
         }),
       );
-
+      print('createDeck response: ${response.statusCode} ${response.body}');
       if (response.statusCode == 201) {
         return Deck.fromJson(jsonDecode(response.body));
       } else if (response.statusCode == 400) {
@@ -82,7 +82,7 @@ class ApiService {
       } else if (response.statusCode == 401) {
         throw Exception('Unauthorized access');
       } else {
-        throw Exception('Failed to create deck: ${response.statusCode}');
+        throw Exception('Failed to create deck: ${response.statusCode} ${response.body}');
       }
     } catch (e) {
       throw Exception('Failed to create deck: $e');
@@ -126,25 +126,20 @@ class ApiService {
   }
 
   Future<List<Deck>> getUserDecks() async {
-    final url = Uri.parse('$baseUrl/anki/user-decks');
-    final token = await _authService.getCurrentUserToken();
     final firebaseUid = _authService.getCurrentUserUid();
-    
-    if (token == null || firebaseUid == null) {
+    if (firebaseUid == null) {
       throw Exception('No authenticated user found');
     }
-    
+    final url = Uri.parse('$baseUrl/anki/user-decks?firebaseUid=$firebaseUid');
     try {
-      final response = await http.post(
+      final response = await http.get(
         url,
         headers: {
           'Content-Type': 'application/json',
+          'X-Firebase-Uid': firebaseUid,
         },
-        body: jsonEncode({
-          'firebaseUid': firebaseUid,
-        }),
       );
-
+      print('getUserDecks raw response: ${response.body}');
       if (response.statusCode == 200) {
         final List<dynamic> decksJson = jsonDecode(response.body);
         return decksJson.map((json) => Deck.fromJson(json)).toList();
@@ -418,7 +413,7 @@ class ApiService {
       throw Exception('Failed to get translation: $e');
     }
   }
-
+  
   Future<List<Card>> getDueCardsForDeck(int deckId) async {
     final url = Uri.parse('$baseUrl/anki/due-cards/$deckId');
     final token = await _authService.getCurrentUserToken();

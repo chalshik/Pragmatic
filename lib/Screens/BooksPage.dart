@@ -3,9 +3,14 @@ import 'package:flutter/material.dart';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:pragmatic/Services/ApiService.dart';
 
 class BooksPage extends StatefulWidget {
-  @override
+  final ApiService apiService;
+  
+  
+
+  BooksPage({super.key, required this.apiService});@override
   _BooksPageState createState() => _BooksPageState();
 }
 
@@ -49,7 +54,7 @@ class _BooksPageState extends State<BooksPage> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => EpubReaderScreen(filePath: book.path),
+        builder: (context) => EpubReaderScreen(filePath: book.path, apiService: widget.apiService,),
       ),
     );
   }

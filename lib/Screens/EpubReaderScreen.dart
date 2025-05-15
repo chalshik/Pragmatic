@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_epub_viewer/flutter_epub_viewer.dart';
 import 'dart:io';
+import 'package:pragmatic/Models/TranslationRequest.dart';
+import 'package:pragmatic/Services/ApiService.dart';
 class EpubReaderScreen extends StatefulWidget {
   final String filePath;
+  final ApiService apiService;
 
-  const EpubReaderScreen({super.key, required this.filePath});
+  const EpubReaderScreen({super.key, required this.filePath, required this.apiService});
 
   @override
   _EpubReaderScreenState createState() => _EpubReaderScreenState();
@@ -61,7 +64,7 @@ class _EpubReaderScreenState extends State<EpubReaderScreen> {
                                 Padding(
                                   padding: const EdgeInsets.all(16.0),
                                   child: Text(
-                                    'Selected: ${epubTextSelection.selectedText}',
+                                    widget.apiService.getTranslation(TranslationRequest(word: epubTextSelection.selectedText, destLang: "en")).toString(),
                                     style: TextStyle(fontSize: 18),
                                   ),
                                 ),

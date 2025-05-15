@@ -1,9 +1,10 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:pragmatic/Services/ApiService.dart';
 import 'package:pragmatic/Widgets/AuthWrapper.dart';
 import 'package:pragmatic/Services/AuthService.dart';
 import 'package:provider/provider.dart';
 import 'BooksPage.dart';
+import 'CardsScreen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -13,18 +14,23 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
-  int _currentIndex = 0; // Track the selected index
+  int _currentIndex = 0;
 
-  // Pages to display for each BottomNavigationBar item
-  final List<Widget> _pages = [
-    BooksPage(), // Updated to include BooksPage
-    const Center(child: Text('Cards Page', style: TextStyle(fontSize: 24))),
-    const Center(child: Text('Settings Page', style: TextStyle(fontSize: 24))),
-    const Center(child: Text('Game Page', style: TextStyle(fontSize: 24))),
-  ];
+  @override
+  void initState() {
+    super.initState();
+  }
 
   @override
   Widget build(BuildContext context) {
+    final authService = Provider.of<AuthService>(context, listen: false);
+    final apiService = ApiService(authService);
+    final List<Widget> pages = [
+      BooksPage(apiService: apiService),
+      CardsScreen(authService: authService),
+      const Center(child: Text('Settings Page', style: TextStyle(fontSize: 24))),
+      const Center(child: Text('Game Page', style: TextStyle(fontSize: 24))),
+    ];
     return AuthWrapper(
       child: Scaffold(
         appBar: AppBar(
@@ -37,7 +43,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 try {
                   final authService = Provider.of<AuthService>(context, listen: false);
                   await authService.signOut();
-                  // No need to navigate - AuthWrapper will handle redirection
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('Logged out successfully')),
                   );
@@ -50,7 +55,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ],
         ),
-        body: _pages[_currentIndex], // Display the selected page
+        body: pages[_currentIndex],
         bottomNavigationBar: BottomNavigationBar(
           backgroundColor: Colors.blueGrey,
           items: const <BottomNavigationBarItem>[
@@ -71,10 +76,10 @@ class _HomeScreenState extends State<HomeScreen> {
               label: 'Game',
             ),
           ],
-          currentIndex: _currentIndex, // Highlight the selected item
+          currentIndex: _currentIndex,
           onTap: (index) {
             setState(() {
-              _currentIndex = index; // Update the selected index
+              _currentIndex = index;
             });
           },
         ),
