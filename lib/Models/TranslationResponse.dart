@@ -42,5 +42,5 @@ class TranslationResponse {
     'det_lang': detLang,
     'translations': translations.map((t) => t.toJson()).toList(),
   };
-  String getTranslationText() {return this.translations.first.text;}
+  String getTranslationText() {return translations.first.text;}
 }

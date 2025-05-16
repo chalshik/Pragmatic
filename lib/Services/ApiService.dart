@@ -12,7 +12,7 @@ import 'package:pragmatic/Models/Review.dart';
 class ApiService {
   // Update this to your development machine's IP address or your API endpoint
   // final String baseUrl = 'http://10.0.2.2';  // Use this for Android emulator
-  final String baseUrl = 'https://specific-backend.onrender.com';  // Local development
+  final String baseUrl = 'http://localhost:8080';  // Local development
   final AuthService _authService;
   ApiService(this._authService);
 
@@ -36,7 +36,7 @@ class ApiService {
         }),
       );
 
-      if (response.statusCode == 201) {
+      if (response.statusCode == 200) {
         return jsonDecode(response.body);
       } else if (response.statusCode == 400) {
         throw Exception('Invalid request data');
