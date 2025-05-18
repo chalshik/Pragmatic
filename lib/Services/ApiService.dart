@@ -1,13 +1,12 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'AuthService.dart';
-import 'package:pragmatic/Models/TranslationRequest.dart';
-import 'package:pragmatic/Models/TranslationResponse.dart';
 import 'package:pragmatic/Models/Card.dart';
 import 'package:pragmatic/Models/Deck.dart';
 import 'package:pragmatic/Models/Book.dart';
 import 'package:pragmatic/Models/ReviewRequest.dart';
 import 'package:pragmatic/Models/Review.dart';
+import 'package:pragmatic/Models/WordEntry.dart';
 
 class ApiService {
   // Update this to your development machine's IP address or your API endpoint
@@ -52,6 +51,20 @@ class ApiService {
     }
   }
 
+  Future<WordEntry> fetchDefinition(String word) async {
+    final url = Uri.parse('https://api.dictionaryapi.dev/api/v2/entries/en/$word');
+
+    final response = await http.get(url);
+
+    if (response.statusCode == 200) {
+      final List<dynamic> data = jsonDecode(response.body);
+      return WordEntry.fromJson(data.first);
+    } else {
+      throw Exception('Word not found or API error: ${response.statusCode}');
+    }
+  }
+
+
   Future<Deck> createDeck({
     required String title,
   }) async {
@@ -75,7 +88,7 @@ class ApiService {
         }),
       );
       print('createDeck response: ${response.statusCode} ${response.body}');
-      if (response.statusCode == 201) {
+      if (response.statusCode == 200 || response.statusCode == 201) {
         return Deck.fromJson(jsonDecode(response.body));
       } else if (response.statusCode == 400) {
         throw Exception('Invalid deck data');
@@ -379,40 +392,6 @@ class ApiService {
     }
   }
 
-  Future<TranslationResponse> getTranslation(TranslationRequest request) async {
-    final url = Uri.parse('$baseUrl/translation');
-    final token = await _authService.getCurrentUserToken();
-    final firebaseUid = _authService.getCurrentUserUid();
-    
-    if (token == null || firebaseUid == null) {
-      throw Exception('No authenticated user found');
-    }
-    
-    try {
-      var requestData = request.toJson();
-      requestData['firebaseUid'] = firebaseUid;
-      
-      final response = await http.post(
-        url,
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode(requestData),
-      );
-
-      if (response.statusCode == 200) {
-        return TranslationResponse.fromJson(jsonDecode(response.body));
-      } else if (response.statusCode == 400) {
-        throw Exception('Invalid translation request');
-      } else if (response.statusCode == 401) {
-        throw Exception('Unauthorized access');
-      } else {
-        throw Exception('Failed to get translation: ${response.statusCode}');
-      }
-    } catch (e) {
-      throw Exception('Failed to get translation: $e');
-    }
-  }
   
   Future<List<Card>> getDueCardsForDeck(int deckId) async {
     final url = Uri.parse('$baseUrl/anki/due-cards/$deckId');
