@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'dart:io';
 import 'package:pragmatic/Services/ApiService.dart';
 import 'package:pragmatic/Models/Deck.dart';
+import 'package:pragmatic/Providers/SelectedDeckProvider.dart';
+import 'package:provider/provider.dart';
 class DecksScreen extends StatefulWidget {
   final ApiService apiService;
   
@@ -17,6 +19,49 @@ class _DecksScreenState extends State<DecksScreen> {
   void initState() {
     super.initState();
     _loadDecks();
+  }
+
+  Future<void> showSelectDefaultDeckDialog(BuildContext context, List<Deck> decks) async {
+    final selectedDeckProvider = Provider.of<SelectedDeckProvider>(context, listen: false);
+
+    final selectedDeck = await showDialog<Deck>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text('Select Default Deck'),
+          content: Container(
+            width: double.maxFinite,
+            child: ListView.separated(
+              shrinkWrap: true,
+              itemCount: decks.length,
+              separatorBuilder: (_, __) => Divider(),
+              itemBuilder: (context, index) {
+                final deck = decks[index];
+                return ListTile(
+                  title: Text(deck.title),
+                  onTap: () {
+                    Navigator.of(context).pop(deck); // Return the selected deck
+                  },
+                );
+              },
+            ),
+          ),
+          actions: [
+            TextButton(
+              child: Text('Cancel'),
+              onPressed: () => Navigator.of(context).pop(null),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (selectedDeck != null) {
+      selectedDeckProvider.selectDeck(selectedDeck);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Selected default deck: ${selectedDeck.title}')),
+      );
+    }
   }
 
   Future<void> _loadDecks() async {
@@ -109,7 +154,7 @@ class _DecksScreenState extends State<DecksScreen> {
         actions: [
           IconButton(
             icon: Icon(Icons.settings),
-            onPressed: _loadDecks,
+            onPressed: () => showSelectDefaultDeckDialog(context, _decks),
           ),
         ],
       ),
