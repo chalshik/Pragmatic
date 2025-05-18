@@ -23,21 +23,36 @@ class ApiService {
   // Helper methods for auth that handle the case where _authService is not initialized
  
   
-  
-    Future<bool> joinGame(String username, String gameCode) async{
-      final url = Uri.parse('$baseUrl/game/join/$gameCode');
-      final body = jsonEncode({'id': "hello"});
-      final response = await http.post(
-        url,headers: {'Content-Type': 'application/json'},
-        body: body,
-      );
-      if (response.statusCode == 201){
+  Future<bool> joinGame(String username, String gameCode) async {
+  final url = Uri.parse('$baseUrl/join/$gameCode'); // corrected endpoint
+
+  final body = jsonEncode({'id': username});
+
+  try {
+    final response = await http.post(
+      url,
+      headers: {'Content-Type': 'application/json'},
+      body: body,
+    );
+
+    if (response.statusCode == 200) {
+      // Optionally parse response JSON for success status
+      final json = jsonDecode(response.body);
+      if (json['status'] == 'SUCCESS') {
         return true;
-      }else{
+      } else {
+        print('Join game failed: ${json['message']}');
         return false;
       }
+    } else {
+      print('Failed with status code: ${response.statusCode}');
+      return false;
     }
-  
+  } catch (e) {
+    print('Exception during joinGame: $e');
+    return false;
+  }
+}
    Future<String?> createGame(String username) async {
     final url = Uri.parse('$baseUrl/game/create'); // your endpoint
     final body = jsonEncode({'id': "hello"});
