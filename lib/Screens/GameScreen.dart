@@ -55,6 +55,7 @@ class _GameScreenState extends State<GameScreen> {
       print("Players in room $gameCode updated: $playerData");
       setState(() {
         players = parsePlayersFromData(playerData);
+        players.add(username);
       });
     });
   }
