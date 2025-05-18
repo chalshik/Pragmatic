@@ -32,7 +32,17 @@ class _GameScreenState extends State<GameScreen> {
   @override
   void initState() {
     super.initState();
-    _webSocketService.connect();
+    _initWebSocketConnection();
+  }
+
+  void _initWebSocketConnection() async {
+    try {
+      await _webSocketService.connect();
+      debugPrint("WebSocket connected successfully in GameScreen");
+    } catch (e) {
+      debugPrint("Error connecting to WebSocket: $e");
+      // Optionally show an error to the user
+    }
   }
 
   @override
@@ -61,34 +71,44 @@ class _GameScreenState extends State<GameScreen> {
     
     setState(() => isCreatingGame = true);
     
-    final String username = _createUsernameController.text.trim();
-    if (username.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please enter a username"))
-      );
-      setState(() => isCreatingGame = false);
-      return;
-    }
+    try {
+      final String username = _createUsernameController.text.trim();
+      if (username.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Please enter a username"))
+        );
+        setState(() => isCreatingGame = false);
+        return;
+      }
 
-    final String? createdGameCode = await _apiService.createGame(username);
-    
-    if (createdGameCode != null) {
-      setState(() {
-        gameCode = createdGameCode;
-        currentUsername = username;
-        isInLobby = true;
-        players = [username]; // Add creator to the initial players list
-      });
+      final String? createdGameCode = await _apiService.createGame(username);
+      debugPrint("API response for created game: $createdGameCode");
       
-      // Subscribe to player updates
-      _subscribeToPlayerUpdates(createdGameCode);
-    } else {
+      if (createdGameCode != null) {
+        setState(() {
+          gameCode = createdGameCode;
+          currentUsername = username;
+          isInLobby = true;
+          players = [username]; // Add creator to the initial players list
+        });
+        
+        // Subscribe to player updates
+        _subscribeToPlayerUpdates(createdGameCode);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Failed to create game"))
+        );
+      }
+    } catch (e) {
+      debugPrint("Error creating game: $e");
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Failed to create game"))
+        SnackBar(content: Text("Error: ${e.toString()}"))
       );
+    } finally {
+      if (mounted) {
+        setState(() => isCreatingGame = false);
+      }
     }
-    
-    setState(() => isCreatingGame = false);
   }
 
   // Method to handle joining an existing game
@@ -138,17 +158,24 @@ class _GameScreenState extends State<GameScreen> {
 
   // Helper method to subscribe to player updates via WebSocket
   void _subscribeToPlayerUpdates(String code) {
-    _webSocketService.subscribeToPlayerUpdates(code, (playerData) {
-      debugPrint("Players in room $code updated: $playerData");
-      setState(() {
-        players = parsePlayersFromData(playerData);
-        
-        // Make sure current user is in the list if not already
-        if (currentUsername != null && !players.contains(currentUsername)) {
-          players.add(currentUsername!);
+    try {
+      debugPrint("Subscribing to player updates for room: $code");
+      _webSocketService.subscribeToPlayerUpdates(code, (playerData) {
+        debugPrint("Players in room $code updated: $playerData");
+        if (mounted) {
+          setState(() {
+            players = parsePlayersFromData(playerData);
+            
+            // Make sure current user is in the list if not already
+            if (currentUsername != null && !players.contains(currentUsername)) {
+              players.add(currentUsername!);
+            }
+          });
         }
       });
-    });
+    } catch (e) {
+      debugPrint("Error subscribing to player updates: $e");
+    }
   }
 
   // UI for the game lobby screen
