@@ -24,7 +24,19 @@ class ApiService {
  
   
   
-  
+    Future<bool> joinGame(String username, String gameCode) async{
+      final url = Uri.parse('$baseUrl/game/join/$gameCode');
+      final body = jsonEncode({'id': "hello"});
+      final response = await http.post(
+        url,headers: {'Content-Type': 'application/json'},
+        body: body,
+      );
+      if (response.statusCode == 201){
+        return true;
+      }else{
+        return false;
+      }
+    }
   
    Future<String?> createGame(String username) async {
     final url = Uri.parse('$baseUrl/game/create'); // your endpoint
@@ -36,7 +48,7 @@ class ApiService {
       body: body,
     );
 
-    if (response.statusCode == 200) {
+    if (response.statusCode == 201) {
       final Map<String,String> roomCode = jsonDecode(response.body);
       print(roomCode["roomCode"]);
       return roomCode["roomCode"];
