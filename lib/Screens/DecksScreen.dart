@@ -16,7 +16,7 @@ class _DecksScreenState extends State<DecksScreen> {
   @override
   void initState() {
     super.initState();
-    _loadDecks;
+    _loadDecks();
   }
 
   Future<void> _loadDecks() async {
@@ -108,29 +108,43 @@ class _DecksScreenState extends State<DecksScreen> {
         title: Text('My Decks'),
         actions: [
           IconButton(
-            icon: Icon(Icons.refresh),
+            icon: Icon(Icons.settings),
             onPressed: _loadDecks,
           ),
         ],
       ),
-      body: _isLoading
-          ? Center(child: CircularProgressIndicator())
-          : _decks.isEmpty
-              ? Center(child: Text('No decks found'))
-              : ListView.separated(
-                  itemCount: _decks.length,
-                  separatorBuilder: (_, __) => Divider(height: 1),
-                  itemBuilder: (context, index) {
-                    final deck = _decks[index];
-                    return ListTile(
-                      title: Text(deck.title),
-                      trailing: Icon(Icons.chevron_right),
-                      onTap: () {
-                        // Navigate to deck details or study screen
-                      },
-                    );
-                  },
-                ),
+      body:RefreshIndicator(
+        onRefresh: _loadDecks,
+        child: _decks.isEmpty && !_isLoading
+            ? ListView(
+                children: [
+                  SizedBox(height: 200),
+                  Center(child: Text('No decks found')),
+                ],
+              )
+            : _isLoading
+                ? ListView(
+                    children: [
+                      SizedBox(height: 200),
+                      Center(child: CircularProgressIndicator()),
+                    ],
+                  )
+                : ListView.separated(
+                    itemCount: _decks.length,
+                    separatorBuilder: (_, __) => Divider(height: 1),
+                    itemBuilder: (context, index) {
+                      final deck = _decks[index];
+                      return ListTile(
+                        title: Text(deck.title),
+                        trailing: Icon(Icons.chevron_right),
+                        onTap: () {
+                          // Navigate to deck details or study screen
+                        },
+                      );
+                    },
+                  ),
+           ),
+
       floatingActionButton: FloatingActionButton(
         onPressed: _createDeck,
         child: Icon(Icons.add),
@@ -138,5 +152,4 @@ class _DecksScreenState extends State<DecksScreen> {
       ),
     );
   }
-
 }

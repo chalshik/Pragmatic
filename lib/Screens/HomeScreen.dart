@@ -7,7 +7,7 @@ import 'package:pragmatic/Screens/BooksPage.dart';
 import 'package:pragmatic/Screens/CardsScreen.dart';
 import 'package:pragmatic/Screens/GameScreen.dart';
 import 'package:pragmatic/Screens/SettingsScreen.dart';
-
+import 'package:pragmatic/Screens/DecksScreen.dart';
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -27,10 +27,11 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     final authService = Provider.of<AuthService>(context, listen: false);
     final apiService = ApiService();
+    apiService.setAuthService(authService);
     
     final List<Widget> pages = [
       BooksPage(apiService: apiService),
-      CardsScreen(authService: authService),
+      DecksScreen(apiService: apiService),
       const SettingsScreen(),
       const GameScreen(),
     ];
