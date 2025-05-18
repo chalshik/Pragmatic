@@ -7,7 +7,7 @@ class GameScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return const Center(
       child: Text(
-        'Game Page',
+        'Korean Card Game',
         style: TextStyle(fontSize: 24),
       ),
     );

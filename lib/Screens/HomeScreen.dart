@@ -3,8 +3,10 @@ import 'package:pragmatic/Services/ApiService.dart';
 import 'package:pragmatic/Widgets/AuthWrapper.dart';
 import 'package:pragmatic/Services/AuthService.dart';
 import 'package:provider/provider.dart';
-import 'BooksPage.dart';
-import 'CardsScreen.dart';
+import 'package:pragmatic/Screens/BooksPage.dart';
+import 'package:pragmatic/Screens/CardsScreen.dart';
+import 'package:pragmatic/Screens/GameScreen.dart';
+import 'package:pragmatic/Screens/SettingsScreen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -25,23 +27,24 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     final authService = Provider.of<AuthService>(context, listen: false);
     final apiService = ApiService(authService);
+    
     final List<Widget> pages = [
       BooksPage(apiService: apiService),
       CardsScreen(authService: authService),
-      const Center(child: Text('Settings Page', style: TextStyle(fontSize: 24))),
-      const Center(child: Text('Game Page', style: TextStyle(fontSize: 24))),
+      const SettingsScreen(),
+      const GameScreen(),
     ];
+    
     return AuthWrapper(
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Home Screen'),
+          title: const Text('Pragmatic Language App'),
           actions: [
             IconButton(
               icon: const Icon(Icons.logout),
               tooltip: 'Logout',
               onPressed: () async {
                 try {
-                  final authService = Provider.of<AuthService>(context, listen: false);
                   await authService.signOut();
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(content: Text('Logged out successfully')),
@@ -55,9 +58,15 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ],
         ),
-        body: pages[_currentIndex],
+        body: IndexedStack(
+          index: _currentIndex,
+          children: pages,
+        ),
         bottomNavigationBar: BottomNavigationBar(
-          backgroundColor: Colors.blueGrey,
+          type: BottomNavigationBarType.fixed,
+          backgroundColor: Colors.white,
+          selectedItemColor: Theme.of(context).colorScheme.primary,
+          unselectedItemColor: Colors.grey,
           items: const <BottomNavigationBarItem>[
             BottomNavigationBarItem(
               icon: Icon(Icons.book),

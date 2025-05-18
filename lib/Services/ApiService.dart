@@ -12,7 +12,7 @@ import 'package:pragmatic/Models/Review.dart';
 class ApiService {
   // Update this to your development machine's IP address or your API endpoint
   // final String baseUrl = 'http://10.0.2.2';  // Use this for Android emulator
-  final String baseUrl = 'http://localhost:8080';  // Local development
+  final String baseUrl = 'https://specific-backend-production.up.railway.app';  // Local development
   final AuthService _authService;
   ApiService(this._authService);
 
