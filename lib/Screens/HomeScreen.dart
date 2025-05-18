@@ -26,7 +26,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final authService = Provider.of<AuthService>(context, listen: false);
-    final apiService = ApiService(authService);
+    final apiService = ApiService();
     
     final List<Widget> pages = [
       BooksPage(apiService: apiService),
