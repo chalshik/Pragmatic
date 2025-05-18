@@ -10,7 +10,7 @@ class BooksScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final authService = Provider.of<AuthService>(context, listen: false);
-    final apiService = ApiService(authService);
+    final apiService = ApiService();
     
     return BooksPage(apiService: apiService);
   }

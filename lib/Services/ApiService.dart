@@ -12,15 +12,45 @@ class ApiService {
   // Update this to your development machine's IP address or your API endpoint
   // final String baseUrl = 'http://10.0.2.2';  // Use this for Android emulator
   final String baseUrl = 'https://specific-backend-production.up.railway.app';  // Local development
-  final AuthService _authService;
-  ApiService(this._authService);
+  AuthService? _authService;
+  
+  ApiService();
+  
+  void setAuthService(AuthService authService) {
+    _authService = authService;
+  }
+  
+  // Helper methods for auth that handle the case where _authService is not initialized
+ 
+  
+  
+  
+  
+   Future<String?> createGame(String username) async {
+    final url = Uri.parse('$baseUrl/game/create'); // your endpoint
+    final body = jsonEncode({'id': "hello"});
 
+    final response = await http.post(
+      url,
+      headers: {'Content-Type': 'application/json'},
+      body: body,
+    );
+
+    if (response.statusCode == 200) {
+      final Map<String,String> roomCode = jsonDecode(response.body);
+      print(roomCode["roomCode"]);
+      return roomCode["roomCode"];
+    } else {
+      print('Error creating game: ${response.statusCode} - ${response.body}');
+      return null;
+    }
+  }
   // Make this method handle the case where the server is not reachable
   Future<Map<String, dynamic>> registerUser({
     required String firebaseUid,
     required String username,
   }) async {
-    final token = await _authService.getCurrentUserToken();
+    final token = await _authService?.getCurrentUserToken();
     final url = Uri.parse('$baseUrl/user/register');
     print(token);
     try {
@@ -69,8 +99,8 @@ class ApiService {
     required String title,
   }) async {
     final url = Uri.parse('$baseUrl/anki/add-deck');
-    final token = await _authService.getCurrentUserToken();
-    final firebaseUid = _authService.getCurrentUserUid();
+    final token = await _authService?.getCurrentUserToken();
+    final firebaseUid = _authService?.getCurrentUserUid();
     
     if (token == null || firebaseUid == null) {
       throw Exception('No authenticated user found');
@@ -106,8 +136,8 @@ class ApiService {
     required String deckId,
   }) async {
     final url = Uri.parse('$baseUrl/anki/delete-deck/$deckId');
-    final token = await _authService.getCurrentUserToken();
-    final firebaseUid = _authService.getCurrentUserUid();
+    final token = await _authService?.getCurrentUserToken();
+    final firebaseUid = _authService?.getCurrentUserUid();
     
     if (token == null || firebaseUid == null) {
       throw Exception('No authenticated user found');
@@ -139,7 +169,7 @@ class ApiService {
   }
 
   Future<List<Deck>> getUserDecks() async {
-    final firebaseUid = _authService.getCurrentUserUid();
+    final firebaseUid = _authService?.getCurrentUserUid();
     if (firebaseUid == null) {
       throw Exception('No authenticated user found');
     }
@@ -174,8 +204,8 @@ class ApiService {
     int? bookId,
   }) async {
     final url = Uri.parse('$baseUrl/anki/add-card');
-    final token = await _authService.getCurrentUserToken();
-    final firebaseUid = _authService.getCurrentUserUid();
+    final token = await _authService?.getCurrentUserToken();
+    final firebaseUid = _authService?.getCurrentUserUid();
     
     if (token == null || firebaseUid == null) {
       throw Exception('No authenticated user found');
@@ -217,9 +247,8 @@ class ApiService {
     required String cardId,
   }) async {
     final url = Uri.parse('$baseUrl/anki/delete-card/$cardId');
-    final token = await _authService.getCurrentUserToken();
-    final firebaseUid = _authService.getCurrentUserUid();
-    
+    final token = await _authService?.getCurrentUserToken();
+    final firebaseUid = _authService?.getCurrentUserUid();
     if (token == null || firebaseUid == null) {
       throw Exception('No authenticated user found');
     }
@@ -253,8 +282,8 @@ class ApiService {
     required String title,
   }) async {
     final url = Uri.parse('$baseUrl/api/books');
-    final token = await _authService.getCurrentUserToken();
-    final firebaseUid = _authService.getCurrentUserUid();
+    final token = await _authService?.getCurrentUserToken();
+    final firebaseUid = _authService?.getCurrentUserUid();
     
     if (token == null || firebaseUid == null) {
       throw Exception('No authenticated user found');
@@ -290,9 +319,8 @@ class ApiService {
     required int bookId,
   }) async {
     final url = Uri.parse('$baseUrl/api/books/$bookId');
-    final token = await _authService.getCurrentUserToken();
-    final firebaseUid = _authService.getCurrentUserUid();
-    
+    final token = await _authService?.getCurrentUserToken();
+    final firebaseUid = _authService?.getCurrentUserUid();
     if (token == null || firebaseUid == null) {
       throw Exception('No authenticated user found');
     }
@@ -324,8 +352,8 @@ class ApiService {
 
   Future<List<Book>> getUserBooks() async {
     final url = Uri.parse('$baseUrl/api/books');
-    final token = await _authService.getCurrentUserToken();
-    final firebaseUid = _authService.getCurrentUserUid();
+    final token = await _authService?.getCurrentUserToken();
+    final firebaseUid = _authService?.getCurrentUserUid();
     
     if (token == null || firebaseUid == null) {
       throw Exception('No authenticated user found');
@@ -357,8 +385,8 @@ class ApiService {
 
   Future<Review> processReview(ReviewRequest request) async {
     final url = Uri.parse('$baseUrl/api/reviews');
-    final token = await _authService.getCurrentUserToken();
-    final firebaseUid = _authService.getCurrentUserUid();
+    final token = await _authService?.getCurrentUserToken();
+    final firebaseUid = _authService?.getCurrentUserUid();
     
     if (token == null || firebaseUid == null) {
       throw Exception('No authenticated user found');
@@ -395,8 +423,8 @@ class ApiService {
   
   Future<List<Card>> getDueCardsForDeck(int deckId) async {
     final url = Uri.parse('$baseUrl/anki/due-cards/$deckId');
-    final token = await _authService.getCurrentUserToken();
-    final firebaseUid = _authService.getCurrentUserUid();
+    final token = await _authService?.getCurrentUserToken();
+    final firebaseUid = _authService?.getCurrentUserUid();;
     
     if (token == null || firebaseUid == null) {
       throw Exception('No authenticated user found');

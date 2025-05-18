@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'firebase_options.dart';
 import 'package:pragmatic/Services/AuthService.dart';
+import 'package:pragmatic/Services/ApiService.dart';
 import 'package:provider/provider.dart';
 import 'package:pragmatic/Screens/HomeScreen.dart';
 import 'package:pragmatic/Screens/LoginScreen.dart';
@@ -31,9 +32,18 @@ class MyApp extends StatelessWidget {
   
   @override
   Widget build(BuildContext context) {
+    // Create instances
+    final authService = AuthService();
+    final apiService = ApiService();
+    
+    // Set up bidirectional dependency using the setter methods
+    authService.setApiService(apiService);
+    apiService.setAuthService(authService);
+    
     return MultiProvider(
       providers: [
-        Provider<AuthService>(create: (_) => AuthService()),
+        Provider<AuthService>(create: (_) => authService),
+        Provider<ApiService>(create: (_) => apiService),
       ],
       child: MaterialApp(
         title: 'Pragmatic',

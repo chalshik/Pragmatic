@@ -18,7 +18,7 @@ class _CardsScreenState extends State<CardsScreen> {
   @override
   void initState() {
     super.initState();
-    _decksFuture = ApiService(widget.authService).getUserDecks();
+    _decksFuture = ApiService().getUserDecks();
   }
 
   void _showCreateDeckDialog() async {
@@ -46,9 +46,9 @@ class _CardsScreenState extends State<CardsScreen> {
     );
     if (result != null && result.isNotEmpty) {
       try {
-        await ApiService(widget.authService).createDeck(title: result);
+        await ApiService().createDeck(title: result);
         setState(() {
-          _decksFuture = ApiService(widget.authService).getUserDecks();
+          _decksFuture = ApiService().getUserDecks();
         });
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
