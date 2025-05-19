@@ -144,6 +144,8 @@ class _EpubReaderScreenState extends State<EpubReaderScreen> {
                             );
                             print('Card created: $createdCard');
 
+                            if (!mounted) return;  // <-- Check widget still active
+
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
                                 content: Text('Card created successfully!'),
@@ -151,10 +153,15 @@ class _EpubReaderScreenState extends State<EpubReaderScreen> {
                               ),
                             );
 
+                            if (!mounted) return;  // <-- Check again before navigation
+
                             Navigator.of(context).pop(); // close the bottom sheet or dialog
                             print('Bottom sheet closed');
                           } else {
                             print('Deck not found or not defined');
+
+                            if (!mounted) return;
+
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
                                 content: Text('Deck not found or not defined.'),
@@ -165,6 +172,9 @@ class _EpubReaderScreenState extends State<EpubReaderScreen> {
                         } catch (e, stackTrace) {
                           print('Failed to create card: $e');
                           print(stackTrace);
+
+                          if (!mounted) return;
+
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: Text('Failed to create card: $e'),
@@ -181,6 +191,7 @@ class _EpubReaderScreenState extends State<EpubReaderScreen> {
                         ),
                       ),
                     ),
+
 
                   ],       
                 ),

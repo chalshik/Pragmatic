@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:pragmatic/Models/Card.dart' as anki;
 import 'package:pragmatic/Services/ApiService.dart';
+import 'package:pragmatic/Models/ReviewRequest.dart';
+import 'package:pragmatic/Models/Review.dart';
+
 
 class CardReviewScreen extends StatefulWidget {
   final int deckId;
@@ -29,31 +32,62 @@ class _CardReviewScreenState extends State<CardReviewScreen> {
   }
 
   Future<void> _loadCards() async {
-    try {
-      final cards = await widget.apiService.getDueCardsForDeck(widget.deckId);
-      setState(() {
-        _cards = cards;
-        _isLoading = false;
-      });
-    } catch (e) {
-      // Handle error
-      print(e);
-    }
-  }
+  try {
+    final cards = await widget.apiService.getCardsForDeck(widget.deckId);
 
-  void _nextCard(String rating) {
-    // TODO: Send review result (rating) to backend if needed
+    // ✅ Log each card's content
+    for (var card in cards) {
+      print('📋 Loaded card: ID=${card.id}, Front="${card.front}", Back="${card.back}"');
+    }
+
+    setState(() {
+      _cards = cards;
+      _isLoading = false;
+    });
+  } catch (e, stackTrace) {
+    print('❌ Failed to load cards for deck ID ${widget.deckId}');
+    print('🛑 Error: $e');
+    print('📌 Stack trace:\n$stackTrace');
+  }
+}
+
+
+  void _nextCard(String label) async {
+    final currentCard = _cards[_currentIndex];
+
+    // Convert string label to enum
+    final ratingMap = {
+      "Again": Rating.AGAIN,
+      "Hard": Rating.HARD,
+      "Good": Rating.GOOD,
+      "Easy": Rating.EASY,
+    };
+
+    final rating = ratingMap[label];
+
+    if (rating == null) {
+      print('⚠️ Invalid rating label: $label');
+      return;
+    }
+
+    try {
+      final request = ReviewRequest(cardId: currentCard.id, rating: rating);
+      await widget.apiService.processReview(request);
+      print('✅ Review processed for card ID ${currentCard.id} with rating $rating');
+    } catch (e) {
+      print('❌ Failed to process review for card ID ${currentCard.id}: $e');
+    }
 
     setState(() {
       _showBack = false;
       if (_currentIndex < _cards.length - 1) {
         _currentIndex++;
       } else {
-        // All done
         Navigator.pop(context);
       }
     });
   }
+
 
   @override
   Widget build(BuildContext context) {

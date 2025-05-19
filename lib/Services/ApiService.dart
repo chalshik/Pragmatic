@@ -413,78 +413,81 @@ class ApiService {
       throw Exception('Failed to fetch user books: $e');
     }
   }
+Future<Review> processReview(ReviewRequest request) async {
+  final url = Uri.parse('$baseUrl/api/reviews');
+  final token = await _authService?.getCurrentUserToken();
+  final firebaseUid = _authService?.getCurrentUserUid();
 
-  Future<Review> processReview(ReviewRequest request) async {
-    final url = Uri.parse('$baseUrl/api/reviews');
-    final token = await _authService?.getCurrentUserToken();
-    final firebaseUid = _authService?.getCurrentUserUid();
-    
-    if (token == null || firebaseUid == null) {
-      throw Exception('No authenticated user found');
-    }
-    
-    try {
-      var requestData = request.toJson();
-      requestData['firebaseUid'] = firebaseUid;
-      
-      final response = await http.post(
-        url,
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode(requestData),
-      );
-
-      if (response.statusCode == 201) {
-        return Review.fromJson(jsonDecode(response.body));
-      } else if (response.statusCode == 400) {
-        throw Exception('Invalid review data');
-      } else if (response.statusCode == 401) {
-        throw Exception('Unauthorized access');
-      } else if (response.statusCode == 404) {
-        throw Exception('Card not found');
-      } else {
-        throw Exception('Failed to process review: ${response.statusCode}');
-      }
-    } catch (e) {
-      throw Exception('Failed to process review: $e');
-    }
+  if (token == null || firebaseUid == null) {
+    throw Exception('No authenticated user found');
   }
+
+  try {
+    var requestData = request.toJson();
+    requestData['firebaseUid'] = firebaseUid;
+
+    print('📤 Sending review for card ID ${request.cardId}');
+    print('📦 Request body: ${jsonEncode(requestData)}');
+
+    final response = await http.post(
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        // 'Authorization': 'Bearer $token', // Uncomment if needed
+      },
+      body: jsonEncode(requestData),
+    );
+
+    print('📥 Response status: ${response.statusCode}');
+    print('📥 Response body: ${response.body}');
+
+    if (response.statusCode == 201 || response.statusCode == 200) {
+      final decoded = jsonDecode(response.body);
+      print('✅ Parsed review response: $decoded');
+      return Review.fromJson(decoded);
+    } else if (response.statusCode == 400) {
+      throw Exception('Invalid review data');
+    } else if (response.statusCode == 401) {
+      throw Exception('Unauthorized access');
+    } else if (response.statusCode == 404) {
+      throw Exception('Card not found');
+    } else {
+      throw Exception('Failed to process review: ${response.statusCode}');
+    }
+  } catch (e, stack) {
+    print('❌ Failed to process review for card ID ${request.cardId}: $e');
+    print('📌 Stack trace:\n$stack');
+    rethrow;
+  }
+}
+
 
   
-  Future<List<Card>> getDueCardsForDeck(int deckId) async {
-    final url = Uri.parse('$baseUrl/anki/due-cards/$deckId');
-    final token = await _authService?.getCurrentUserToken();
-    final firebaseUid = _authService?.getCurrentUserUid();;
-    
-    if (token == null || firebaseUid == null) {
+  Future<List<Card>> getCardsForDeck(int deckId) async {
+    final firebaseUid = _authService?.getCurrentUserUid();
+
+    if (firebaseUid == null) {
       throw Exception('No authenticated user found');
     }
-    
-    try {
-      final response = await http.post(
-        url,
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({
-          'deckId': deckId,
-          'firebaseUid': firebaseUid,
-        }),
-      );
 
-      if (response.statusCode == 200) {
-        final List<dynamic> cardsJson = jsonDecode(response.body);
-        return cardsJson.map((json) => Card.fromJson(json)).toList();
-      } else if (response.statusCode == 401) {
-        throw Exception('Unauthorized access');
-      } else if (response.statusCode == 404) {
-        throw Exception('Deck not found');
-      } else {
-        throw Exception('Failed to fetch due cards: ${response.statusCode}');
-      }
-    } catch (e) {
-      throw Exception('Failed to fetch due cards: $e');
+    final url = Uri.parse(
+      '$baseUrl/api/cards/deck/$deckId?firebaseUid=$firebaseUid',
+    );
+
+    final response = await http.get(
+      url,
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Firebase-Uid': firebaseUid,
+      },
+    );
+
+    if (response.statusCode == 200) {
+      final List<dynamic> cardsJson = jsonDecode(response.body);
+      return cardsJson.map((json) => Card.fromJson(json)).toList();
+    } else {
+      throw Exception('Failed to fetch cards: ${response.statusCode}');
     }
   }
+
 }
