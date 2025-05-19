@@ -4,6 +4,8 @@ import 'package:pragmatic/Services/ApiService.dart';
 import 'package:pragmatic/Models/Deck.dart';
 import 'package:pragmatic/Providers/SelectedDeckProvider.dart';
 import 'package:provider/provider.dart';
+import 'package:pragmatic/Screens/DeckSelectionDialog.dart';
+import 'package:pragmatic/Screens/CardReviewScreen.dart';
 class DecksScreen extends StatefulWidget {
   final ApiService apiService;
   
@@ -19,49 +21,6 @@ class _DecksScreenState extends State<DecksScreen> {
   void initState() {
     super.initState();
     _loadDecks();
-  }
-
-  Future<void> showSelectDefaultDeckDialog(BuildContext context, List<Deck> decks) async {
-    final selectedDeckProvider = Provider.of<SelectedDeckProvider>(context, listen: false);
-
-    final selectedDeck = await showDialog<Deck>(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: Text('Select Default Deck'),
-          content: Container(
-            width: double.maxFinite,
-            child: ListView.separated(
-              shrinkWrap: true,
-              itemCount: decks.length,
-              separatorBuilder: (_, __) => Divider(),
-              itemBuilder: (context, index) {
-                final deck = decks[index];
-                return ListTile(
-                  title: Text(deck.title),
-                  onTap: () {
-                    Navigator.of(context).pop(deck); // Return the selected deck
-                  },
-                );
-              },
-            ),
-          ),
-          actions: [
-            TextButton(
-              child: Text('Cancel'),
-              onPressed: () => Navigator.of(context).pop(null),
-            ),
-          ],
-        );
-      },
-    );
-
-    if (selectedDeck != null) {
-      selectedDeckProvider.selectDeck(selectedDeck);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Selected default deck: ${selectedDeck.title}')),
-      );
-    }
   }
 
   Future<void> _loadDecks() async {
@@ -152,9 +111,16 @@ class _DecksScreenState extends State<DecksScreen> {
       appBar: AppBar(
         title: Text('My Decks'),
         actions: [
-          IconButton(
-            icon: Icon(Icons.settings),
-            onPressed: () => showSelectDefaultDeckDialog(context, _decks),
+          Builder(
+            builder: (context) {
+              return IconButton(
+                icon: Icon(Icons.settings),
+                onPressed: () => showDialog(
+                  context: context,
+                  builder: (dialogContext) => DeckDialog(_decks),
+                ),
+              );
+            },
           ),
         ],
       ),
@@ -183,7 +149,15 @@ class _DecksScreenState extends State<DecksScreen> {
                         title: Text(deck.title),
                         trailing: Icon(Icons.chevron_right),
                         onTap: () {
-                          // Navigate to deck details or study screen
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => CardReviewScreen(
+                                deckId: deck.id,
+                                apiService: widget.apiService,
+                              ),
+                            ),
+                          );
                         },
                       );
                     },

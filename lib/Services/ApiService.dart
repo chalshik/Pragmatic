@@ -223,52 +223,56 @@ class ApiService {
     }
   }
 
-  Future<Card> createCard({
-    required String front,
-    required String back,
-    required int deckId,
-    String? context,
-    int? bookId,
-  }) async {
-    final url = Uri.parse('$baseUrl/anki/add-card');
-    final token = await _authService?.getCurrentUserToken();
-    final firebaseUid = _authService?.getCurrentUserUid();
-    
-    if (token == null || firebaseUid == null) {
-      throw Exception('No authenticated user found');
-    }
-    
-    try {
-      final response = await http.post(
-        url,
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({
-          'front': front,
-          'back': back,
-          'deckId': deckId,
-          'firebaseUid': firebaseUid,
-          if (context != null) 'context': context,
-          if (bookId != null) 'bookId': bookId,
-        }),
-      );
+  Future<http.Response> createCard({
+  required String deckId,
+  required String front,
+  required String back,
+}) async {
+  final firebaseUid = _authService?.getCurrentUserUid();
 
-      if (response.statusCode == 201) {
-        return Card.fromJson(jsonDecode(response.body));
-      } else if (response.statusCode == 400) {
-        throw Exception('Invalid card data');
-      } else if (response.statusCode == 401) {
-        throw Exception('Unauthorized access');
-      } else if (response.statusCode == 404) {
-        throw Exception('Deck not found');
-      } else {
-        throw Exception('Failed to create card: ${response.statusCode}');
-      }
-    } catch (e) {
-      throw Exception('Failed to create card: $e');
-    }
+  if (firebaseUid == null) {
+    print('❌ No authenticated user found');
+    throw Exception('No authenticated user found');
   }
+
+  // 🔐 Log Firebase UID
+  print('👤 Firebase UID: $firebaseUid');
+
+  final url = Uri.parse(
+    'https://specific-backend-production.up.railway.app/api/cards/deck/$deckId?firebaseUid=$firebaseUid',
+  );
+
+  final headers = {
+    'Content-Type': 'application/json',
+    'X-Firebase-Uid': firebaseUid,
+  };
+
+  final body = jsonEncode({
+    'front': front,
+    'back': back,
+  });
+
+  // 🧪 Equivalent curl log
+  print('📎 Equivalent curl command:');
+  print('curl -X POST "$url" \\');
+  print('  -H "Content-Type: application/json" \\');
+  print('  -H "X-Firebase-Uid: $firebaseUid" \\');
+  print("  -d '$body'");
+
+  final response = await http.post(
+    url,
+    headers: headers,
+    body: body,
+  );
+
+  print('✅ Response received');
+  print('🔢 Status code: ${response.statusCode}');
+  print('📄 Response body: ${response.body}');
+
+  return response;
+}
+
+
 
   Future<void> deleteCard({
     required String cardId,

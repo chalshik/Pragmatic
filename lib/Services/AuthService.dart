@@ -93,6 +93,8 @@ class AuthService {
   // Get current user UID
   String? getCurrentUserUid() {
     User? user = _auth.currentUser;
+    print("User:");
+    print(user);
     return user?.uid;
   }
 }

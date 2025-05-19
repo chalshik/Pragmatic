@@ -11,6 +11,7 @@ import 'package:pragmatic/Screens/BooksScreen.dart';
 import 'package:pragmatic/Screens/CardsScreen.dart';
 import 'package:pragmatic/Screens/GameScreen.dart';
 import 'package:pragmatic/Screens/SettingsScreen.dart';
+import 'Providers/SelectedDeckProvider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -24,7 +25,16 @@ void main() async {
     print("Error initializing Firebase: $e");
   }
   
-  runApp(const MyApp());
+  runApp(
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => SelectedDeckProvider()),
+        // other providers...
+      ],
+      child: MyApp(),
+    ),
+  );
+
 }
 
 class MyApp extends StatelessWidget {

@@ -4,6 +4,8 @@ import 'dart:io';
 import 'package:pragmatic/Services/ApiService.dart';
 import 'package:pragmatic/Models/WordEntry.dart';
 import 'package:audioplayers/audioplayers.dart';
+import 'package:provider/provider.dart';
+import 'package:pragmatic/Providers/SelectedDeckProvider.dart';
 
 class EpubReaderScreen extends StatefulWidget {
   final String filePath;
@@ -13,11 +15,32 @@ class EpubReaderScreen extends StatefulWidget {
 
   @override
   _EpubReaderScreenState createState() => _EpubReaderScreenState();
+  
 }
 
 class _EpubReaderScreenState extends State<EpubReaderScreen> {
     final epubController = EpubController();
     var textSelection = '';
+
+    String generateBackText(WordEntry wordEntry) {
+      final buffer = StringBuffer();
+
+      for (final meaning in wordEntry.meanings) {
+        buffer.writeln(meaning.partOfSpeech); // e.g. noun, verb
+
+        for (final def in meaning.definitions) {
+          buffer.writeln('- ${def.definition}');
+          if (def.example != null && def.example!.isNotEmpty) {
+            buffer.writeln('Example: "${def.example}"');
+          }
+        }
+
+        buffer.writeln(); // add a blank line between meanings
+      }
+
+      return buffer.toString().trim();
+    }
+
 
     void showWordDetailBottomSheet(BuildContext context, WordEntry wordEntry) {
       final word = wordEntry.word;
@@ -104,10 +127,53 @@ class _EpubReaderScreenState extends State<EpubReaderScreen> {
                       );
                     }).toList(),
                     ElevatedButton(
-                      onPressed: () {
-                        // Add to dictionary
+                      onPressed: () async {
+                        print('Create card button pressed');
+                        final deckId = Provider.of<SelectedDeckProvider>(context, listen: false).selectedDeck?.id;
+                        print('Selected deck ID: $deckId');
+                        final back = generateBackText(wordEntry);
+                        print('Generated back text: $back');
+
+                        try {
+                          if (deckId != null) {
+                            print('Calling apiService.createCard...');
+                            final createdCard = await widget.apiService.createCard(
+                              front: word,
+                              back: back,
+                              deckId: deckId.toString(),
+                            );
+                            print('Card created: $createdCard');
+
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Card created successfully!'),
+                                duration: Duration(seconds: 2),
+                              ),
+                            );
+
+                            Navigator.of(context).pop(); // close the bottom sheet or dialog
+                            print('Bottom sheet closed');
+                          } else {
+                            print('Deck not found or not defined');
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text('Deck not found or not defined.'),
+                                duration: Duration(seconds: 2),
+                              ),
+                            );
+                          }
+                        } catch (e, stackTrace) {
+                          print('Failed to create card: $e');
+                          print(stackTrace);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Failed to create card: $e'),
+                              duration: Duration(seconds: 2),
+                            ),
+                          );
+                        }
                       },
-                      child: Text('+ to dictionary'),
+                      child: Text('+ create card'),
                       style: ElevatedButton.styleFrom(
                         minimumSize: Size(double.infinity, 48),
                         shape: RoundedRectangleBorder(
@@ -115,7 +181,8 @@ class _EpubReaderScreenState extends State<EpubReaderScreen> {
                         ),
                       ),
                     ),
-                  ],
+
+                  ],       
                 ),
               );
             },

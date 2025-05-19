@@ -1,5 +1,4 @@
 import 'dart:convert';
-
 import 'package:flutter/material.dart';
 import 'package:pragmatic/Services/ApiService.dart';
 import 'package:pragmatic/Services/WebSocketService.dart';
@@ -32,17 +31,7 @@ class _GameScreenState extends State<GameScreen> {
   @override
   void initState() {
     super.initState();
-    _initWebSocketConnection();
-  }
-
-  void _initWebSocketConnection() async {
-    try {
-      await _webSocketService.connect();
-      debugPrint("WebSocket connected successfully in GameScreen");
-    } catch (e) {
-      debugPrint("Error connecting to WebSocket: $e");
-      // Optionally show an error to the user
-    }
+    _webSocketService.connect();
   }
 
   @override
@@ -56,36 +45,13 @@ class _GameScreenState extends State<GameScreen> {
 
   // Helper method to parse player data from WebSocket
   List<String> parsePlayersFromData(dynamic playerData) {
-    debugPrint("Parsing player data: $playerData");
-    
-    try {
-      // Case 1: Direct list of player names
-      if (playerData is List) {
-        return playerData.map((e) => e.toString()).toList();
-      }
-      
-      // Case 2: Map containing players as a list
-      else if (playerData is Map<String, dynamic>) {
-        // Check for 'players' key
-        if (playerData.containsKey('players')) {
-          final List<dynamic> playersData = playerData['players'];
-          return playersData.map((e) => e.toString()).toList();
-        }
-        
-        // Check if there's another key that might contain players
-        for (var entry in playerData.entries) {
-          if (entry.value is List) {
-            return (entry.value as List).map((e) => e.toString()).toList();
-          }
-        }
-      }
-      
-      // Default: return empty list for unsupported formats
-      return [];
-    } catch (e) {
-      debugPrint("Error parsing player data: $e");
-      return [];
+    if (playerData is Map<String, dynamic> && playerData.containsKey('players')) {
+      final List<dynamic> playersData = playerData['players'];
+      return playersData.map((e) => e.toString()).toList();
+    } else if (playerData is List) {
+      return playerData.map((e) => e.toString()).toList();
     }
+    return [];
   }
 
   // Method to handle creating a new game
@@ -94,44 +60,34 @@ class _GameScreenState extends State<GameScreen> {
     
     setState(() => isCreatingGame = true);
     
-    try {
-      final String username = _createUsernameController.text.trim();
-      if (username.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Please enter a username"))
-        );
-        return;
-      }
-
-      // Create game and get room code
-      final String? roomCode = await _apiService.createGame(username);
-      debugPrint("Received room code: $roomCode");
-      
-      if (roomCode != null && roomCode.isNotEmpty) {
-        setState(() {
-          gameCode = roomCode;
-          currentUsername = username;
-          isInLobby = true;
-          players = [username]; // Add creator to the initial players list
-        });
-        
-        // Subscribe to player updates
-        _subscribeToPlayerUpdates(roomCode);
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Failed to create game"))
-        );
-      }
-    } catch (e) {
-      debugPrint("Error creating game: $e");
+    final String username = _createUsernameController.text.trim();
+    if (username.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error: ${e.toString()}"))
+        const SnackBar(content: Text("Please enter a username"))
       );
-    } finally {
-      if (mounted) {
-        setState(() => isCreatingGame = false);
-      }
+      setState(() => isCreatingGame = false);
+      return;
     }
+
+    final String? createdGameCode = await _apiService.createGame(username);
+    
+    if (createdGameCode != null) {
+      setState(() {
+        gameCode = createdGameCode;
+        currentUsername = username;
+        isInLobby = true;
+        players = [username]; // Add creator to the initial players list
+      });
+      
+      // Subscribe to player updates
+      _subscribeToPlayerUpdates(createdGameCode);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Failed to create game"))
+      );
+    }
+    
+    setState(() => isCreatingGame = false);
   }
 
   // Method to handle joining an existing game
@@ -140,85 +96,58 @@ class _GameScreenState extends State<GameScreen> {
     
     setState(() => isJoiningGame = true);
     
-    try {
-      final String username = _joinUsernameController.text.trim();
-      final String joinCode = _gameCodeController.text.trim().toUpperCase();
-      
-      if (username.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Please enter a username"))
-        );
-        return;
-      }
-      
-      if (joinCode.isEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Please enter a game code"))
-        );
-        return;
-      }
-
-      // Join the game with the provided code
-      final bool joinedRoom = await _apiService.joinGame(username, joinCode);
-      debugPrint("Joined room result: $joinedRoom");
-      
-      if (joinedRoom) {
-        setState(() {
-          gameCode = joinCode;
-          currentUsername = username;
-          isInLobby = true;
-          // Initially add yourself to the player list
-          players = [username];
-        });
-        
-        // Subscribe to player updates
-        _subscribeToPlayerUpdates(joinCode);
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Failed to join game. Invalid code or game is full."))
-        );
-      }
-    } catch (e) {
-      debugPrint("Error joining game: $e");
+    final String username = _joinUsernameController.text.trim();
+    final String joinCode = _gameCodeController.text.trim().toUpperCase();
+    
+    if (username.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error: ${e.toString()}"))
+        const SnackBar(content: Text("Please enter a username"))
       );
-    } finally {
-      if (mounted) {
-        setState(() => isJoiningGame = false);
-      }
+      setState(() => isJoiningGame = false);
+      return;
     }
+    
+    if (joinCode.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Please enter a game code"))
+      );
+      setState(() => isJoiningGame = false);
+      return;
+    }
+
+    final bool joinedRoom = await _apiService.joinGame(username, joinCode);
+    
+    if (joinedRoom) {
+      setState(() {
+        gameCode = joinCode;
+        currentUsername = username;
+        isInLobby = true;
+      });
+      
+      // Subscribe to player updates
+      _subscribeToPlayerUpdates(joinCode);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Failed to join game"))
+      );
+    }
+    
+    setState(() => isJoiningGame = false);
   }
 
   // Helper method to subscribe to player updates via WebSocket
   void _subscribeToPlayerUpdates(String code) {
-    try {
-      debugPrint("Subscribing to player updates for room: $code");
-      
-      _webSocketService.subscribeToPlayerUpdates(code, (playerData) {
-        debugPrint("Received player update: $playerData");
+    _webSocketService.subscribeToPlayerUpdates(code, (playerData) {
+      debugPrint("Players in room $code updated: $playerData");
+      setState(() {
+        players = parsePlayersFromData(playerData);
         
-        if (mounted) {
-          setState(() {
-            // Parse the players data
-            final List<String> updatedPlayers = parsePlayersFromData(playerData);
-            players = updatedPlayers;
-            
-            // Ensure current user is in the list
-            if (currentUsername != null && currentUsername!.isNotEmpty && 
-                !players.contains(currentUsername)) {
-              players.add(currentUsername!);
-            }
-          });
+        // Make sure current user is in the list if not already
+        if (currentUsername != null && !players.contains(currentUsername)) {
+          players.add(currentUsername!);
         }
       });
-    } catch (e) {
-      debugPrint("Error subscribing to player updates: $e");
-      // Show error to user if critical
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Error connecting to game updates: ${e.toString()}"))
-      );
-    }
+    });
   }
 
   // UI for the game lobby screen
