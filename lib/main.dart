@@ -6,11 +6,7 @@ import 'package:pragmatic/Services/ApiService.dart';
 import 'package:provider/provider.dart';
 import 'package:pragmatic/Screens/HomeScreen.dart';
 import 'package:pragmatic/Screens/LoginScreen.dart';
-import 'package:pragmatic/Screens/RegisterScrenn.dart';
-import 'package:pragmatic/Screens/BooksScreen.dart';
-import 'package:pragmatic/Screens/CardsScreen.dart';
-import 'package:pragmatic/Screens/GameScreen.dart';
-import 'package:pragmatic/Screens/SettingsScreen.dart';
+import 'package:pragmatic/Screens/RegisterScreen.dart';
 import 'Providers/SelectedDeckProvider.dart';
 
 void main() async {
@@ -66,13 +62,6 @@ class MyApp extends StatelessWidget {
           '/login': (context) => const LoginScreen(),
           '/register': (context) => const RegisterScreen(),
           '/home': (context) => const HomeScreen(),
-          '/books': (context) => const BooksScreen(),
-          '/cards': (context) {
-            final authService = Provider.of<AuthService>(context, listen: false);
-            return CardsScreen(authService: authService);
-          },
-          '/game': (context) => const GameScreen(),
-          '/settings': (context) => const SettingsScreen(),
         },
       ),
     );

@@ -4,7 +4,6 @@ import 'package:pragmatic/Widgets/AuthWrapper.dart';
 import 'package:pragmatic/Services/AuthService.dart';
 import 'package:provider/provider.dart';
 import 'package:pragmatic/Screens/BooksPage.dart';
-import 'package:pragmatic/Screens/CardsScreen.dart';
 import 'package:pragmatic/Screens/GameScreen.dart';
 import 'package:pragmatic/Screens/SettingsScreen.dart';
 import 'package:pragmatic/Screens/DecksScreen.dart';
