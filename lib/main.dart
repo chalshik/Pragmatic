@@ -11,7 +11,7 @@ import 'Providers/SelectedDeckProvider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
   try {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
@@ -20,7 +20,7 @@ void main() async {
   } catch (e) {
     print("Error initializing Firebase: $e");
   }
-  
+
   runApp(
     MultiProvider(
       providers: [
@@ -30,22 +30,21 @@ void main() async {
       child: MyApp(),
     ),
   );
-
 }
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
-  
+
   @override
   Widget build(BuildContext context) {
     // Create instances
     final authService = AuthService();
     final apiService = ApiService();
-    
+
     // Set up bidirectional dependency using the setter methods
     authService.setApiService(apiService);
     apiService.setAuthService(authService);
-    
+
     return MultiProvider(
       providers: [
         Provider<AuthService>(create: (_) => authService),
@@ -67,5 +66,3 @@ class MyApp extends StatelessWidget {
     );
   }
 }
-
-

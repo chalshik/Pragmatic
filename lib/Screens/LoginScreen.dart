@@ -24,9 +24,7 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('Login'),
-      ),
+      appBar: AppBar(title: Text('Login')),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -70,9 +68,9 @@ class _LoginScreenState extends State<LoginScreen> {
                 try {
                   User? user = await authService.signIn(email, password);
                   if (user != null) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Login successful')),
-                    );
+                    ScaffoldMessenger.of(
+                      context,
+                    ).showSnackBar(SnackBar(content: Text('Login successful')));
                     // Navigate to home screen
                     Navigator.of(context).pushReplacementNamed('/home');
                   }
@@ -87,9 +85,9 @@ class _LoginScreenState extends State<LoginScreen> {
                   } else {
                     errorMessage = 'An error occurred. Please try again.';
                   }
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(errorMessage)),
-                  );
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(SnackBar(content: Text(errorMessage)));
                 } catch (e) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(content: Text('An unexpected error occurred')),

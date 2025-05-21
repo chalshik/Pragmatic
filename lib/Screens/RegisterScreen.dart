@@ -27,9 +27,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('Register'),
-      ),
+      appBar: AppBar(title: Text('Register')),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -83,7 +81,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 }
 
                 try {
-                  User? user = await authService.signUp(email, password, username: username);
+                  User? user = await authService.signUp(
+                    email,
+                    password,
+                    username: username,
+                  );
                   if (user != null) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(content: Text('Registration successful')),
@@ -106,9 +108,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   } else {
                     errorMessage = 'An error occurred. Please try again.';
                   }
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(errorMessage)),
-                  );
+                  ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(SnackBar(content: Text(errorMessage)));
                 } catch (e) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(content: Text('An unexpected error occurred')),
@@ -119,7 +121,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
             ),
             TextButton(
               onPressed: () {
-                Navigator.of(context).pop();  // or Navigator.of(context).pushReplacementNamed('/login');
+                Navigator.of(
+                  context,
+                ).pop(); // or Navigator.of(context).pushReplacementNamed('/login');
               },
               child: Text('Already have an account? Login'),
             ),

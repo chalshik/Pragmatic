@@ -48,12 +48,13 @@ class _DeckDialogState extends State<DeckDialog> {
             DropdownButton<Deck>(
               value: selectedDeck,
               isExpanded: true,
-              items: widget.decks.map((deck) {
-                return DropdownMenuItem<Deck>(
-                  value: deck,
-                  child: Text(deck.title),
-                );
-              }).toList(),
+              items:
+                  widget.decks.map((deck) {
+                    return DropdownMenuItem<Deck>(
+                      value: deck,
+                      child: Text(deck.title),
+                    );
+                  }).toList(),
               onChanged: (Deck? newDeck) {
                 setState(() {
                   selectedDeck = newDeck;
@@ -72,8 +73,10 @@ class _DeckDialogState extends State<DeckDialog> {
                     print('CONFIRM button pressed');
                     if (selectedDeck != null) {
                       print('Selecting deck with id: ${selectedDeck!.id}');
-                      Provider.of<SelectedDeckProvider>(context, listen: false)
-                          .selectDeck(selectedDeck!);
+                      Provider.of<SelectedDeckProvider>(
+                        context,
+                        listen: false,
+                      ).selectDeck(selectedDeck!);
                     } else {
                       print('No deck selected');
                     }
@@ -83,9 +86,7 @@ class _DeckDialogState extends State<DeckDialog> {
                 ),
 
                 ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.grey,
-                  ),
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.grey),
                   child: Text("CLOSE"),
                   onPressed: () => Navigator.pop(context),
                 ),

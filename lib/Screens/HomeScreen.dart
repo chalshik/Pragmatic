@@ -7,6 +7,7 @@ import 'package:pragmatic/Screens/BooksPage.dart';
 import 'package:pragmatic/Screens/GameScreen.dart';
 import 'package:pragmatic/Screens/SettingsScreen.dart';
 import 'package:pragmatic/Screens/DecksScreen.dart';
+
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -27,14 +28,14 @@ class _HomeScreenState extends State<HomeScreen> {
     final authService = Provider.of<AuthService>(context, listen: false);
     final apiService = ApiService();
     apiService.setAuthService(authService);
-    
+
     final List<Widget> pages = [
       BooksPage(apiService: apiService),
       DecksScreen(apiService: apiService),
       const SettingsScreen(),
       const GameScreen(),
     ];
-    
+
     return AuthWrapper(
       child: Scaffold(
         appBar: AppBar(
@@ -58,20 +59,14 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ],
         ),
-        body: IndexedStack(
-          index: _currentIndex,
-          children: pages,
-        ),
+        body: IndexedStack(index: _currentIndex, children: pages),
         bottomNavigationBar: BottomNavigationBar(
           type: BottomNavigationBarType.fixed,
           backgroundColor: Colors.white,
           selectedItemColor: Theme.of(context).colorScheme.primary,
           unselectedItemColor: Colors.grey,
           items: const <BottomNavigationBarItem>[
-            BottomNavigationBarItem(
-              icon: Icon(Icons.book),
-              label: 'Books',
-            ),
+            BottomNavigationBarItem(icon: Icon(Icons.book), label: 'Books'),
             BottomNavigationBarItem(
               icon: Icon(Icons.credit_card),
               label: 'Cards',
@@ -80,10 +75,7 @@ class _HomeScreenState extends State<HomeScreen> {
               icon: Icon(Icons.settings),
               label: 'Settings',
             ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.gamepad),
-              label: 'Game',
-            ),
+            BottomNavigationBarItem(icon: Icon(Icons.gamepad), label: 'Game'),
           ],
           currentIndex: _currentIndex,
           onTap: (index) {

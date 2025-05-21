@@ -7,10 +7,9 @@ import 'package:pragmatic/Services/ApiService.dart';
 
 class BooksPage extends StatefulWidget {
   final ApiService apiService;
-  
-  
 
-  const BooksPage({super.key, required this.apiService});@override
+  const BooksPage({super.key, required this.apiService});
+  @override
   _BooksPageState createState() => _BooksPageState();
 }
 
@@ -35,7 +34,10 @@ class _BooksPageState extends State<BooksPage> {
   }
 
   Future<void> _addBook() async {
-    final result = await FilePicker.platform.pickFiles(type: FileType.custom, allowedExtensions: ['epub']);
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['epub'],
+    );
     if (result != null && result.files.single.path != null) {
       final directory = await getApplicationDocumentsDirectory();
       final booksDir = Directory('${directory.path}/books');
@@ -43,7 +45,9 @@ class _BooksPageState extends State<BooksPage> {
         await booksDir.create(recursive: true);
       }
       final file = File(result.files.single.path!);
-      final newFile = await file.copy('${booksDir.path}/${file.uri.pathSegments.last}');
+      final newFile = await file.copy(
+        '${booksDir.path}/${file.uri.pathSegments.last}',
+      );
       setState(() {
         _books.add(newFile);
       });
@@ -54,7 +58,11 @@ class _BooksPageState extends State<BooksPage> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => EpubReaderScreen(filePath: book.path, apiService: widget.apiService,),
+        builder:
+            (context) => EpubReaderScreen(
+              filePath: book.path,
+              apiService: widget.apiService,
+            ),
       ),
     );
   }
@@ -62,9 +70,7 @@ class _BooksPageState extends State<BooksPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text("Books"),
-      ),
+      appBar: AppBar(title: Text("Books")),
       body: GridView.builder(
         padding: EdgeInsets.all(8.0),
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(

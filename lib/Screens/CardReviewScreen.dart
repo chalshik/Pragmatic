@@ -4,7 +4,6 @@ import 'package:pragmatic/Services/ApiService.dart';
 import 'package:pragmatic/Models/ReviewRequest.dart';
 import 'package:pragmatic/Models/Review.dart';
 
-
 class CardReviewScreen extends StatefulWidget {
   final int deckId;
   final ApiService apiService;
@@ -32,25 +31,26 @@ class _CardReviewScreenState extends State<CardReviewScreen> {
   }
 
   Future<void> _loadCards() async {
-  try {
-    final cards = await widget.apiService.getCardsForDeck(widget.deckId);
+    try {
+      final cards = await widget.apiService.getCardsForDeck(widget.deckId);
 
-    // ✅ Log each card's content
-    for (var card in cards) {
-      print('📋 Loaded card: ID=${card.id}, Front="${card.front}", Back="${card.back}"');
+      // ✅ Log each card's content
+      for (var card in cards) {
+        print(
+          '📋 Loaded card: ID=${card.id}, Front="${card.front}", Back="${card.back}"',
+        );
+      }
+
+      setState(() {
+        _cards = cards;
+        _isLoading = false;
+      });
+    } catch (e, stackTrace) {
+      print('❌ Failed to load cards for deck ID ${widget.deckId}');
+      print('🛑 Error: $e');
+      print('📌 Stack trace:\n$stackTrace');
     }
-
-    setState(() {
-      _cards = cards;
-      _isLoading = false;
-    });
-  } catch (e, stackTrace) {
-    print('❌ Failed to load cards for deck ID ${widget.deckId}');
-    print('🛑 Error: $e');
-    print('📌 Stack trace:\n$stackTrace');
   }
-}
-
 
   void _nextCard(String label) async {
     final currentCard = _cards[_currentIndex];
@@ -73,7 +73,9 @@ class _CardReviewScreenState extends State<CardReviewScreen> {
     try {
       final request = ReviewRequest(cardId: currentCard.id, rating: rating);
       await widget.apiService.processReview(request);
-      print('✅ Review processed for card ID ${currentCard.id} with rating $rating');
+      print(
+        '✅ Review processed for card ID ${currentCard.id} with rating $rating',
+      );
     } catch (e) {
       print('❌ Failed to process review for card ID ${currentCard.id}: $e');
     }
@@ -87,7 +89,6 @@ class _CardReviewScreenState extends State<CardReviewScreen> {
       }
     });
   }
-
 
   @override
   Widget build(BuildContext context) {

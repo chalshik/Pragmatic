@@ -56,7 +56,10 @@ class WebSocketService {
     }
   }
 
-  void _setupSubscription(String destination, Function(Map<String, dynamic>) callback) {
+  void _setupSubscription(
+    String destination,
+    Function(Map<String, dynamic>) callback,
+  ) {
     _stompClient.subscribe(
       destination: destination,
       callback: (frame) {
@@ -73,26 +76,27 @@ class WebSocketService {
       throw Exception("Not connected to WebSocket");
     }
 
-    _stompClient.send(
-      destination: destination,
-      body: jsonEncode(body),
-    );
+    _stompClient.send(destination: destination, body: jsonEncode(body));
   }
 
-  void sendWithHeader(String destination, String body, Map<String, String> headers) {
+  void sendWithHeader(
+    String destination,
+    String body,
+    Map<String, String> headers,
+  ) {
     if (!_isConnected) {
       throw Exception("Not connected to WebSocket");
     }
 
-    _stompClient.send(
-      destination: destination,
-      body: body,
-      headers: headers,
-    );
+    _stompClient.send(destination: destination, body: body, headers: headers);
   }
-  void subscribeToPlayerUpdates(String? gameCode, Function(Map<String, dynamic>) onPlayerUpdate) {
+
+  void subscribeToPlayerUpdates(
+    String? gameCode,
+    Function(Map<String, dynamic>) onPlayerUpdate,
+  ) {
     final destination = "/topic/game/$gameCode/players";
-    
+
     // Subscribe only if connected
     if (_isConnected) {
       _stompClient.subscribe(
@@ -109,6 +113,7 @@ class WebSocketService {
       // Optionally, queue subscription or throw error
     }
   }
+
   void disconnect() {
     _stompClient.deactivate();
     _isConnected = false;
