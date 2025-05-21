@@ -47,7 +47,6 @@ class _DecksScreenState extends State<DecksScreen> {
     }
   }
 
-
   Future<void> _createDeck() async {
     final nameController = TextEditingController();
 
@@ -108,7 +107,7 @@ class _DecksScreenState extends State<DecksScreen> {
     }
   }
 
-  Future<void> _deleteDeck(String deckId) async {
+  Future<void> _deleteDeck(int deckId) async {
     try {
       setState(() => _isLoading = true);
       await widget.apiService.deleteDeck(deckId: deckId);
@@ -118,36 +117,44 @@ class _DecksScreenState extends State<DecksScreen> {
       });
     } catch (e) {
       setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error deleting deck: $e')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Error deleting deck: $e')));
     }
   }
 
-  void _showDeleteConfirmation(String deckId) {
+  void _deckActionsDialog(Deck deck) {
     showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Delete Deck'),
-        content: Text('Are you sure you want to delete this deck?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text('Cancel'),
+      builder:
+          (context) => AlertDialog(
+            title: Text('Deck Actions: ${deck.title}'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextButton(
+                  onPressed: () {
+                    try {
+                      _deleteDeck(deck.id);
+                      Navigator.pop(context);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Deck deleted successfully')),
+                      );
+                    } catch (e) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Error deleting deck: $e')),
+                      );
+                    }
+                  },
+
+                  child: Text('Delete deck'),
+                ),
+              ],
+            ),
           ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context, true);
-              _deleteDeck(deckId);
-            },
-            child: Text('Delete'),
-          ),
-        ],
-      ),
     );
   }
-  
-  
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -192,10 +199,6 @@ class _DecksScreenState extends State<DecksScreen> {
                     final deck = _decks[index];
                     return ListTile(
                       title: Text(deck.title),
-                      trailing: IconButton(
-                        icon: Icon(Icons.delete),
-                        onPressed: () => _showDeleteConfirmation(deck.id.toString()),
-                      ),
                       onTap: () {
                         Navigator.push(
                           context,
@@ -207,6 +210,9 @@ class _DecksScreenState extends State<DecksScreen> {
                                 ),
                           ),
                         );
+                      },
+                      onLongPress: () {
+                        _deckActionsDialog(deck);
                       },
                     );
                   },

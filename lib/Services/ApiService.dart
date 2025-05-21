@@ -155,21 +155,28 @@ class ApiService {
     }
   }
 
-  Future<void> deleteDeck({required String deckId}) async {
-    final url = Uri.parse('$baseUrl/anki/delete-deck/$deckId');
+  Future<void> deleteDeck({required int deckId}) async {
+    
     final token = await _authService?.getCurrentUserToken();
     final firebaseUid = _authService?.getCurrentUserUid();
-
+    final url = Uri.parse(
+          'https://specific-backend-production.up.railway.app/anki/delete-deck/$deckId',
+    );
     if (token == null || firebaseUid == null) {
       throw Exception('No authenticated user found');
     }
 
+    print('request body: ${jsonEncode({'firebaseUid': firebaseUid})}');
     try {
       final response = await http.delete(
         url,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'firebaseUid': firebaseUid}),
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Firebase-Uid': firebaseUid,
+        },
       );
+
+      print('Response body: ${response.body}');
 
       if (response.statusCode == 200) {
         return;
