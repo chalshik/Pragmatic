@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
-import 'dart:io';
 import 'package:pragmatic/Services/ApiService.dart';
 import 'package:pragmatic/Models/Deck.dart';
-import 'package:pragmatic/Providers/SelectedDeckProvider.dart';
-import 'package:provider/provider.dart';
 import 'package:pragmatic/Screens/DeckSelectionDialog.dart';
 import 'package:pragmatic/Screens/CardReviewScreen.dart';
 

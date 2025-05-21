@@ -45,8 +45,6 @@ class _EpubReaderScreenState extends State<EpubReaderScreen> {
   }
 
   void showWordDetailBottomSheet(BuildContext context, WordEntry wordEntry) {
-    // Save the current sheet context for SnackBars
-    final bottomSheetContext = context;
     final word = wordEntry.word;
     final phonetic = wordEntry.phonetic;
     final audio =
@@ -64,125 +62,171 @@ class _EpubReaderScreenState extends State<EpubReaderScreen> {
       isDismissible: true,
       useSafeArea: true,
       builder: (context) {
-        return Scaffold(
-          backgroundColor: Colors.transparent,
-          body: Stack(
-            children: [
-              // Add invisible barrier to detect taps outside sheet
-              Positioned.fill(
-                child: GestureDetector(
-                  onTap: () => Navigator.pop(context),
-                  behavior: HitTestBehavior.opaque,
-                  child: Container(color: Colors.transparent),
-                ),
-              ),
-              DraggableScrollableSheet(
-                initialChildSize: 0.45,
-                minChildSize: 0.3,
-                maxChildSize: 0.85,
-                builder: (context, scrollController) {
-                  return ScaffoldMessenger(
-                    child: Material(
-                      color: Colors.transparent,
+        return GestureDetector(
+          onTap: () {}, // Prevents tap from dismissing sheet
                       child: Container(
-                        decoration: BoxDecoration(
+            decoration: const BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.vertical(
-                            top: Radius.circular(24),
+                top: Radius.circular(28),
                           ),
                           boxShadow: [
-                            BoxShadow(color: Colors.black12, blurRadius: 10),
+                BoxShadow(color: Colors.black12, blurRadius: 10, spreadRadius: 5),
                           ],
                         ),
-                        padding: EdgeInsets.all(16),
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.85,
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Drag handle
+                Container(
+                  margin: const EdgeInsets.only(top: 12),
+                  height: 4,
+                  width: 40,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[300],
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+                
+                // Word and pronunciation
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 20, 24, 0),
                         child: Column(
                           children: [
-                            // 1) Expanded list of word + phonetic + meanings
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
                             Expanded(
-                              child: ListView(
-                                controller: scrollController,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Center(
-                                    child: Text(
+                                Text(
                                       word,
-                                      style: TextStyle(
+                                  style: const TextStyle(
                                         fontSize: 28,
                                         fontWeight: FontWeight.bold,
                                       ),
                                     ),
-                                  ),
-                                  if (phonetic.isNotEmpty) ...[
-                                    SizedBox(height: 8),
-                                    Center(
-                                      child: Text(
+                                if (phonetic.isNotEmpty)
+                                  Text(
                                         '/$phonetic/',
                                         style: TextStyle(
                                           fontSize: 18,
                                           color: Colors.grey[700],
                                         ),
                                       ),
+                              ],
+                            ),
                                     ),
-                                  ],
-                                  if (audio != null && audio.isNotEmpty) ...[
-                                    SizedBox(height: 8),
-                                    Center(
-                                      child: IconButton(
-                                        icon: Icon(Icons.volume_up),
-                                        onPressed: () async {
+                          if (audio != null && audio.isNotEmpty)
+                            Material(
+                              color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(40),
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(40),
+                                onTap: () async {
                                           final player = AudioPlayer();
                                           await player.play(UrlSource(audio));
                                         },
+                                child: Padding(
+                                  padding: const EdgeInsets.all(10.0),
+                                  child: Icon(
+                                    Icons.volume_up, 
+                                    color: Theme.of(context).colorScheme.primary,
+                                  ),
+                                ),
                                       ),
                                     ),
                                   ],
-                                  SizedBox(height: 16),
-                                  // All the meaning/definition widgets (they will scroll if too long)
-                                  ...wordEntry.meanings.map((meaning) {
+                      ),
+                    ],
+                  ),
+                ),
+                
+                // Divider
+                Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  child: Divider(color: Colors.grey[200], height: 1),
+                ),
+                
+                // Definitions section - scrollable
+                Flexible(
+                  child: SingleChildScrollView(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(24, 0, 24, 16),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: wordEntry.meanings.map((meaning) {
                                     return Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
+                            crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
-                                        Text(
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, 
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                child: Text(
                                           meaning.partOfSpeech,
                                           style: TextStyle(
                                             fontWeight: FontWeight.bold,
-                                            fontSize: 18,
+                                    color: Theme.of(context).colorScheme.primary,
+                                  ),
                                           ),
                                         ),
+                              const SizedBox(height: 8),
                                         ...meaning.definitions.map((d) {
                                           return Padding(
-                                            padding: const EdgeInsets.symmetric(
-                                              vertical: 6,
-                                            ),
+                                  padding: const EdgeInsets.only(bottom: 12),
                                             child: Column(
-                                              crossAxisAlignment:
-                                                  CrossAxisAlignment.start,
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
                                               children: [
-                                                Text('- ${d.definition}'),
-                                                if (d.example != null &&
-                                                    d.example!.isNotEmpty)
-                                                  Text(
-                                                    'Example: "${d.example}"',
+                                          const Text('• ', style: TextStyle(fontSize: 16)),
+                                          Expanded(
+                                            child: Text(
+                                              d.definition,
+                                              style: const TextStyle(fontSize: 16),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      if (d.example != null && d.example!.isNotEmpty)
+                                        Padding(
+                                          padding: const EdgeInsets.only(left: 14, top: 4),
+                                          child: Text(
+                                            '"${d.example}"',
                                                     style: TextStyle(
-                                                      color: Colors.grey[600],
+                                              color: Colors.grey[700],
+                                              fontStyle: FontStyle.italic,
+                                            ),
                                                     ),
                                                   ),
                                               ],
                                             ),
                                           );
                                         }).toList(),
-                                        SizedBox(height: 12),
+                              const SizedBox(height: 8),
                                       ],
                                     );
                                   }).toList(),
-                                  // Add some bottom padding so the last bit of text doesn't get hidden
-                                  SizedBox(height: 12),
-                                ],
+                      ),
+                    ),
                               ),
                             ),
 
-                            // 2) Fixed "Create card" button at the bottom
-                            ElevatedButton(
+                // Create card button
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(24, 8, 24, 24),
+                  child: ElevatedButton.icon(
                               onPressed: () async {
                                 print('Create card button pressed');
 
@@ -194,16 +238,20 @@ class _EpubReaderScreenState extends State<EpubReaderScreen> {
                                     ).selectedDeck?.id;
                                 print('Selected deck ID: $deckId');
 
-                                // Use our GlobalKey for SnackBar messages
-
                                 if (deckId == null) {
                                   print('Deck not found or not defined');
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
                                       content: Text(
-                                        'Deck not found or not defined.',
+                              'Please select a deck first.',
+                            ),
+                            action: SnackBarAction(
+                              label: 'Select',
+                              onPressed: () {
+                                // Add deck selection dialog here if needed
+                              },
                                       ),
-                                      duration: Duration(seconds: 2),
+                            duration: Duration(seconds: 3),
                                       behavior: SnackBarBehavior.floating,
                                       margin: EdgeInsets.only(
                                         bottom: 80,
@@ -234,6 +282,7 @@ class _EpubReaderScreenState extends State<EpubReaderScreen> {
                                       content: Text(
                                         'Card created successfully!',
                                       ),
+                            backgroundColor: Colors.green,
                                       duration: Duration(seconds: 2),
                                       behavior: SnackBarBehavior.floating,
                                       margin: EdgeInsets.only(
@@ -265,22 +314,18 @@ class _EpubReaderScreenState extends State<EpubReaderScreen> {
                                   );
                                 }
                               },
-                              child: Text('+ create card'),
+                    icon: Icon(Icons.add_card),
+                    label: Text('Add to Flashcards'),
                               style: ElevatedButton.styleFrom(
-                                minimumSize: Size(double.infinity, 48),
+                      minimumSize: Size(double.infinity, 50),
                                 shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
                                 ),
                               ),
                             ),
                           ],
                         ),
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ],
           ),
         );
       },
@@ -290,6 +335,16 @@ class _EpubReaderScreenState extends State<EpubReaderScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
+      appBar: AppBar(
+        title: const Text('EPUB Reader'),
+        backgroundColor: Colors.white,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+      ),
       body: SafeArea(
         child: Column(
           children: [
