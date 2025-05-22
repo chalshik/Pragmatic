@@ -25,6 +25,7 @@ class _EpubReaderScreenState extends State<EpubReaderScreen> {
   final epubController = EpubController();
   var textSelection = '';
 
+  
   String generateBackText(WordEntry wordEntry) {
     final buffer = StringBuffer();
 
@@ -243,18 +244,18 @@ class _EpubReaderScreenState extends State<EpubReaderScreen> {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
                                       content: Text(
-                              'Please select a deck first.',
-                            ),
-                            action: SnackBarAction(
-                              label: 'Select',
-                              onPressed: () {
-                                // Add deck selection dialog here if needed
-                              },
+                                        'Please select a deck first.',
                                       ),
-                            duration: Duration(seconds: 3),
+                                      action: SnackBarAction(
+                                        label: 'Select',
+                                        onPressed: () {
+                                          // Add deck selection dialog here if needed
+                                        },
+                                      ),
+                                      duration: Duration(seconds: 3),
                                       behavior: SnackBarBehavior.floating,
                                       margin: EdgeInsets.only(
-                                        bottom: 80,
+                                        top: MediaQuery.of(context).padding.top + 10,
                                         left: 20,
                                         right: 20,
                                       ),
@@ -276,13 +277,16 @@ class _EpubReaderScreenState extends State<EpubReaderScreen> {
                                       );
                                   print('Card created: $response');
 
-                                  // Show success message that will appear above the sheet
+                                  // Close the bottom sheet first
+                                  Navigator.of(context).pop();
+                                  
+                                  // Then show success message
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
                                       content: Text(
                                         'Card created successfully!',
                                       ),
-                            backgroundColor: Colors.green,
+                                      backgroundColor: Colors.green,
                                       duration: Duration(seconds: 2),
                                       behavior: SnackBarBehavior.floating,
                                       margin: EdgeInsets.only(
@@ -296,7 +300,10 @@ class _EpubReaderScreenState extends State<EpubReaderScreen> {
                                   print('Failed to create card: $e');
                                   print(stackTrace);
 
-                                  // Show error message that will appear above the sheet
+                                  // Close the bottom sheet first on error too
+                                  Navigator.of(context).pop();
+                                  
+                                  // Then show error message
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     SnackBar(
                                       content: Text(
@@ -380,6 +387,7 @@ class _EpubReaderScreenState extends State<EpubReaderScreen> {
                             left: 20,
                             right: 20,
                           ),
+                          duration: Duration(seconds: 2),
                         ),
                       );
                     }

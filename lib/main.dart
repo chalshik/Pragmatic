@@ -26,7 +26,6 @@ void main() async {
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => SelectedDeckProvider()),
-        // other providers...
       ],
       child: MyApp(),
     ),

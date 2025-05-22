@@ -162,11 +162,22 @@ class _DecksScreenState extends State<DecksScreen> {
             builder: (context) {
               return IconButton(
                 icon: Icon(Icons.settings),
-                onPressed:
-                    () => showDialog(
-                      context: context,
-                      builder: (dialogContext) => DeckDialog(_decks),
-                    ),
+                onPressed: () {
+                  if (_decks.isEmpty) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('No decks available to select from')),
+                    );
+                    return;
+                  }
+                  
+                  print('Settings icon pressed in DecksScreen');
+                  showDialog(
+                    context: context,
+                    builder: (context) => DeckDialog(_decks),
+                  ).then((value) {
+                    print('Dialog closed with value: $value');
+                  });
+                },
               );
             },
           ),

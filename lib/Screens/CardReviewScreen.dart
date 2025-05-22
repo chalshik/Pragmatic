@@ -3,6 +3,7 @@ import 'package:pragmatic/Models/Card.dart' as anki;
 import 'package:pragmatic/Services/ApiService.dart';
 import 'package:pragmatic/Models/ReviewRequest.dart';
 import 'package:pragmatic/Models/Review.dart';
+import 'package:pragmatic/Screens/DeckSelectionDialog.dart';
 
 class CardReviewScreen extends StatefulWidget {
   final int deckId;
@@ -23,6 +24,7 @@ class _CardReviewScreenState extends State<CardReviewScreen> {
   int _currentIndex = 0;
   bool _showBack = false;
   bool _isLoading = true;
+  int _remaining = 0;
 
   @override
   void initState() {
@@ -43,6 +45,7 @@ class _CardReviewScreenState extends State<CardReviewScreen> {
 
       setState(() {
         _cards = cards;
+        _remaining = cards.length;
         _isLoading = false;
       });
     } catch (e, stackTrace) {
@@ -84,6 +87,7 @@ class _CardReviewScreenState extends State<CardReviewScreen> {
       _showBack = false;
       if (_currentIndex < _cards.length - 1) {
         _currentIndex++;
+        _remaining = _cards.length - _currentIndex;
       } else {
         Navigator.pop(context);
       }
@@ -93,62 +97,162 @@ class _CardReviewScreenState extends State<CardReviewScreen> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return Scaffold(body: Center(child: CircularProgressIndicator()));
+      return Scaffold(
+        backgroundColor: Color(0xFFF5F5F5),
+        body: Center(child: CircularProgressIndicator()),
+      );
     }
 
     if (_cards.isEmpty) {
-      return Scaffold(body: Center(child: Text("No cards due.")));
+      return Scaffold(
+        backgroundColor: Color(0xFFF5F5F5),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.check_circle_outline, size: 64, color: Colors.green),
+              SizedBox(height: 16),
+              Text(
+                "No cards due",
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              ),
+              SizedBox(height: 8),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text("Back to Decks"),
+              ),
+            ],
+          ),
+        ),
+      );
     }
 
     final card = _cards[_currentIndex];
+    final screenHeight = MediaQuery.of(context).size.height;
 
     return Scaffold(
-      appBar: AppBar(title: Text('Review')),
+      backgroundColor: Color(0xFFF5F5F5),
+      appBar: AppBar(
+        title: Text('Review'),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Center(
+              child: Text(
+                'Remaining: $_remaining',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+            ),
+          ),
+          
+        ],
+      ),
       body: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          GestureDetector(
-            onTap: () => setState(() => _showBack = !_showBack),
-            child: Card(
-              elevation: 4,
-              margin: EdgeInsets.all(16),
+          // Card content - expanded to fill available space
+          Expanded(
+            child: GestureDetector(
+              onTap: () => setState(() => _showBack = !_showBack),
               child: Container(
-                height: 250,
-                alignment: Alignment.center,
-                padding: EdgeInsets.all(20),
-                child: Text(
-                  _showBack ? card.back : card.front,
-                  style: TextStyle(fontSize: 22),
-                  textAlign: TextAlign.center,
+                margin: EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 5,
+                      spreadRadius: 1,
+                    ),
+                  ],
+                ),
+                child: Stack(
+                  children: [
+                    // Card content
+                    Center(
+                      child: SingleChildScrollView(
+                        padding: EdgeInsets.all(24),
+                        child: Text(
+                          _showBack ? card.back : card.front,
+                          style: TextStyle(
+                            fontSize: 24, 
+                            height: 1.5,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ),
+                    // Indicator for which side is showing
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: Container(
+                        padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.black12,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          _showBack ? "BACK" : "FRONT",
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black54,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
           ),
+          
+          // Review buttons
           if (_showBack)
-            Column(
-              children: [
-                Text("How was it?"),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    _reviewButton("Again", Colors.red),
-                    _reviewButton("Hard", Colors.orange),
-                    _reviewButton("Good", Colors.green),
-                    _reviewButton("Easy", Colors.blue),
-                  ],
-                ),
-              ],
+            Container(
+              padding: EdgeInsets.symmetric(vertical: 16, horizontal: 12),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  _ankiStyleButton("Again", Colors.red.shade500),
+                  _ankiStyleButton("Hard", Colors.orange.shade600),
+                  _ankiStyleButton("Good", Colors.green.shade600),
+                  _ankiStyleButton("Easy", Colors.blue.shade600),
+                ],
+              ),
             ),
+          
+          // Space at the bottom for better ergonomics
+          SizedBox(height: 8),
         ],
       ),
     );
   }
 
-  Widget _reviewButton(String label, Color color) {
-    return ElevatedButton(
-      onPressed: () => _nextCard(label),
-      style: ElevatedButton.styleFrom(backgroundColor: color),
-      child: Text(label),
+  Widget _ankiStyleButton(String label, Color color) {
+    return Expanded(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4),
+        child: ElevatedButton(
+          onPressed: () => _nextCard(label),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: color,
+            foregroundColor: Colors.white,
+            padding: EdgeInsets.symmetric(vertical: 12),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 15,
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

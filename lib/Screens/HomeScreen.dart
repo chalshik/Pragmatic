@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:pragmatic/Services/ApiService.dart';
-import 'package:pragmatic/Widgets/AuthWrapper.dart';
 import 'package:pragmatic/Services/AuthService.dart';
-import 'package:provider/provider.dart';
+import 'package:pragmatic/Widgets/AuthWrapper.dart';
 import 'package:pragmatic/Screens/BooksPage.dart';
 import 'package:pragmatic/Screens/GameScreen.dart';
 import 'package:pragmatic/Screens/SettingsScreen.dart';
 import 'package:pragmatic/Screens/DecksScreen.dart';
+import 'package:provider/provider.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -17,10 +17,20 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
+  late final List<Widget> pages;
 
   @override
   void initState() {
     super.initState();
+    final authService = Provider.of<AuthService>(context, listen: false);
+    final apiService = ApiService();
+    apiService.setAuthService(authService);
+    pages = [
+      BooksPage(apiService: apiService),
+      DecksScreen(apiService: apiService),
+      const SettingsScreen(),
+      const GameScreen(),
+    ];
   }
 
   final List<String> _titles = [
@@ -32,17 +42,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final authService = Provider.of<AuthService>(context, listen: false);
-    final apiService = ApiService();
-    apiService.setAuthService(authService);
-
-    final List<Widget> pages = [
-      BooksPage(apiService: apiService),
-      DecksScreen(apiService: apiService),
-      const SettingsScreen(),
-      const GameScreen(),
-    ];
-
     return AuthWrapper(
       child: Scaffold(
         backgroundColor: Theme.of(context).colorScheme.background,
@@ -58,26 +57,30 @@ class _HomeScreenState extends State<HomeScreen> {
                   await showDialog(
                     context: context,
                     builder: (context) => AlertDialog(
-                      title: const Text('Logout'),
-                      content: const Text('Are you sure you want to logout?'),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(context),
-                          child: const Text('Cancel'),
-                        ),
-                        TextButton(
-                          onPressed: () async {
-                            Navigator.pop(context);
-                            await authService.signOut();
-                            if (mounted) {
-                              Navigator.of(context).pushReplacementNamed('/login');
-                            }
-                          },
-                          child: const Text('Logout'),
-                        ),
-                      ],
-                    ),
-                  );
+                          title: const Text('Logout'),
+                          content: const Text(
+                              'Are you sure you want to logout?'),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context),
+                              child: const Text('Cancel'),
+                            ),
+                            TextButton(
+                              onPressed: () async {
+                                Navigator.pop(context);
+                                final authService = Provider.of<AuthService>(
+                                    context,
+                                    listen: false);
+                                await authService.signOut();
+                                if (mounted) {
+                                  Navigator.of(context)
+                                      .pushReplacementNamed('/login');
+                                }
+                              },
+                              child: const Text('Logout'),
+                            ),
+                          ],
+                        ));
                 } catch (e) {
                   ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
@@ -90,7 +93,10 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ],
         ),
-        body: pages[_currentIndex],
+        body: IndexedStack(
+          index: _currentIndex,
+          children: pages,
+        ),
         bottomNavigationBar: Container(
           decoration: BoxDecoration(
             boxShadow: [
@@ -108,11 +114,11 @@ class _HomeScreenState extends State<HomeScreen> {
             selectedItemColor: Theme.of(context).colorScheme.primary,
             unselectedItemColor: Colors.grey,
             selectedLabelStyle: const TextStyle(
-              fontWeight: FontWeight.w500, 
+              fontWeight: FontWeight.w500,
               fontSize: 12,
             ),
             unselectedLabelStyle: const TextStyle(
-              fontWeight: FontWeight.w500, 
+              fontWeight: FontWeight.w500,
               fontSize: 12,
             ),
             elevation: 0,

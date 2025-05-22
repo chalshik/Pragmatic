@@ -1,8 +1,8 @@
 // widgets/deck_dialog.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../Providers/SelectedDeckProvider.dart';
-import '../Models/Deck.dart';
+import '../Providers/SelectedDeckProvider.dart'; // Ensure this path is correct
+import '../Models/Deck.dart'; // Ensure this path is correct
 
 class DeckDialog extends StatefulWidget {
   final List<Deck> decks;
@@ -13,88 +13,82 @@ class DeckDialog extends StatefulWidget {
 }
 
 class _DeckDialogState extends State<DeckDialog> {
-  Deck? selectedDeck;
+  Deck? _selectedDeck;
 
   @override
   void initState() {
     super.initState();
-    selectedDeck = widget.decks.isNotEmpty ? widget.decks.first : null;
+    final selectedDeckProvider = Provider.of<SelectedDeckProvider>(context, listen: false);
+    Deck? globallySelected = selectedDeckProvider.selectedDeck;
+
+    if (globallySelected != null && widget.decks.any((d) => d.id == globallySelected!.id)) {
+      _selectedDeck = widget.decks.firstWhere((d) => d.id == globallySelected!.id);
+    } else if (widget.decks.isNotEmpty) {
+      _selectedDeck = widget.decks.first;
+    } else {
+      _selectedDeck = null;
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Title with question icon
-            Row(
-              children: [
-                Text(
-                  "Default deck",
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-                ),
-                SizedBox(width: 6),
-                Icon(Icons.help_outline, size: 18),
-              ],
-            ),
-            SizedBox(height: 12),
+    if (widget.decks.isEmpty) {
+      return AlertDialog(
+        title: const Text('No Decks'),
+        content: const Text('There are no decks available to select.'),
+        actions: <Widget>[
+          TextButton(
+            child: const Text('OK'),
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+        ],
+      );
+    }
 
-            // Dropdown
-            DropdownButton<Deck>(
-              value: selectedDeck,
-              isExpanded: true,
-              items:
-                  widget.decks.map((deck) {
-                    return DropdownMenuItem<Deck>(
-                      value: deck,
-                      child: Text(deck.title),
-                    );
-                  }).toList(),
-              onChanged: (Deck? newDeck) {
-                setState(() {
-                  selectedDeck = newDeck;
-                });
-              },
+    return AlertDialog(
+      title: const Text('Set Default Deck'),
+      content: DropdownButton<Deck>(
+        value: _selectedDeck,
+        isExpanded: true,
+        hint: const Text('Select a deck'),
+        items: widget.decks.map((deck) {
+          return DropdownMenuItem<Deck>(
+            value: deck,
+            child: Text(
+              deck.title ?? 'Untitled Deck',
+              overflow: TextOverflow.ellipsis,
             ),
-            SizedBox(height: 24),
-
-            // Buttons
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                ElevatedButton(
-                  child: Text("CONFIRM"),
-                  onPressed: () {
-                    print('CONFIRM button pressed');
-                    if (selectedDeck != null) {
-                      print('Selecting deck with id: ${selectedDeck!.id}');
-                      Provider.of<SelectedDeckProvider>(
-                        context,
-                        listen: false,
-                      ).selectDeck(selectedDeck!);
-                    } else {
-                      print('No deck selected');
-                    }
-                    Navigator.pop(context);
-                    print('Navigator.pop called, bottom sheet/dialog closed');
-                  },
-                ),
-
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.grey),
-                  child: Text("CLOSE"),
-                  onPressed: () => Navigator.pop(context),
-                ),
-              ],
-            ),
-          ],
-        ),
+          );
+        }).toList(),
+        onChanged: (Deck? newDeck) {
+          setState(() {
+            _selectedDeck = newDeck;
+          });
+        },
       ),
+      actions: [
+        TextButton(
+          child: const Text('CANCEL'),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        ElevatedButton(
+          child: const Text('CONFIRM'),
+          onPressed: () {
+            if (_selectedDeck != null) {
+              Provider.of<SelectedDeckProvider>(context, listen: false)
+                  .selectDeck(_selectedDeck!);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('${_selectedDeck!.title} is now the default deck')),
+              );
+              Navigator.of(context).pop(true);
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Please select a deck')),
+              );
+            }
+          },
+        ),
+      ],
     );
   }
 }
