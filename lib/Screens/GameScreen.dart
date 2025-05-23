@@ -1,4 +1,5 @@
 
+
 import 'package:flutter/material.dart';
 import 'package:pragmatic/Services/ApiService.dart';
 import 'package:pragmatic/Services/WebSocketService.dart';
@@ -27,6 +28,7 @@ class _GameScreenState extends State<GameScreen> {
   bool isJoiningGame = false;
   bool isInLobby = false;
   String? currentUsername;
+  bool readyToStart = false;
 
   @override
   void initState() {
@@ -43,16 +45,34 @@ class _GameScreenState extends State<GameScreen> {
     super.dispose();
   }
 
-  // Helper method to parse player data from WebSocket
-  List<String> parsePlayersFromData(dynamic playerData) {
-    if (playerData is Map<String, dynamic> && playerData.containsKey('players')) {
-      final List<dynamic> playersData = playerData['players'];
-      return playersData.map((e) => e.toString()).toList();
-    } else if (playerData is List) {
-      return playerData.map((e) => e.toString()).toList();
+ List<String> parsePlayersFromData(dynamic playerData) {
+  try {
+    print("Parsing playerData: $playerData (type: ${playerData.runtimeType})");
+
+    if (playerData is List) {
+      return playerData.map((e) {
+        if (e is Map<String, dynamic>) {
+          return e['id']?.toString() ?? e['username']?.toString() ?? 'Unknown';
+        }
+        return e.toString();
+      }).toList();
     }
+
+    if (playerData is Map<String, dynamic>) {
+      if (playerData.containsKey('players') && playerData['players'] is List) {
+        return parsePlayersFromData(playerData['players']);
+      }
+      return [playerData['id']?.toString() ?? 'Unknown'];
+    }
+
+    return [playerData.toString()];
+  } catch (e, stack) {
+    print("Error parsing players: $e");
+    print(stack);
     return [];
   }
+}
+
 
   // Method to handle creating a new game
   void onCreateGame() async {
@@ -66,10 +86,8 @@ class _GameScreenState extends State<GameScreen> {
         const SnackBar(content: Text("Please enter a username"))
       );
       setState(() => isCreatingGame = false);
-
       return;
     }
-    
 
     final String? createdGameCode = await _apiService.createGame(username);
     
@@ -117,13 +135,15 @@ class _GameScreenState extends State<GameScreen> {
       return;
     }
 
-    final bool joinedRoom = await _apiService.joinGame(username, joinCode);
+    final List<String>? joinedRoom = await _apiService.joinGame(username, joinCode);
     
-    if (joinedRoom) {
+    if (joinedRoom != null) {
       setState(() {
         gameCode = joinCode;
         currentUsername = username;
         isInLobby = true;
+        players = joinedRoom;
+        readyToStart = players.length >1;
       });
       
       // Subscribe to player updates
@@ -138,19 +158,25 @@ class _GameScreenState extends State<GameScreen> {
   }
 
   // Helper method to subscribe to player updates via WebSocket
-  void _subscribeToPlayerUpdates(String code) {
-    _webSocketService.subscribeToPlayerUpdates(code, (playerData) {
-      debugPrint("Players in room $code updated: $playerData");
+void _subscribeToPlayerUpdates(String code) {
+  _webSocketService.subscribeToPlayerUpdates(code, (playerData) {
+    print("Players raw data in room $code updated: $playerData");
+    try {
       setState(() {
-        players = parsePlayersFromData(playerData);
         
-        // Make sure current user is in the list if not already
-        if (currentUsername != null && !players.contains(currentUsername)) {
-          players.add(currentUsername!);
-        }
+        players = parsePlayersFromData(playerData);
+        print("players type: ${players.runtimeType}, contents: $players");
+
+        readyToStart = players.length >1;
+       
       });
-    });
-  }
+    } catch (e, stack) {
+      print("Error parsing or setting players: $e");
+      print(stack);
+    }
+  });
+}
+
 
   // UI for the game lobby screen
   Widget _buildLobbyScreen() {
@@ -218,14 +244,20 @@ class _GameScreenState extends State<GameScreen> {
         ),
         const SizedBox(height: 20),
         ElevatedButton(
-          onPressed: () {
-            // Logic to start the game - would be implemented later
-            // This could send a WebSocket message to all players
-          },
-          style: ElevatedButton.styleFrom(
-            minimumSize: const Size(double.infinity, 50),
-          ),
-          child: const Text('Start Game', style: TextStyle(fontSize: 18)),
+          onPressed: readyToStart ?  () {
+           ScaffoldMessenger.of(context).showSnackBar(
+  SnackBar(
+    content: Text('Game Started!'),
+    duration: Duration(seconds: 2),
+  ),
+);
+          } : null,
+           style: ElevatedButton.styleFrom(
+    minimumSize: const Size(double.infinity, 50),
+    backgroundColor: readyToStart ? Colors.green : Colors.grey,
+    foregroundColor: Colors.white, // text color
+  ),
+          child:   Text( readyToStart ? "Start game": "Waiting to players", style: TextStyle(fontSize: 18)),
         ),
       ],
     );

@@ -92,28 +92,44 @@ class WebSocketService {
   }
 
   void subscribeToPlayerUpdates(
-    String? gameCode,
-    Function(Map<String, dynamic>) onPlayerUpdate,
-  ) {
-    final destination = "/topic/game/$gameCode/players";
+  String? gameCode,
+  Function(List<Map<String, dynamic>>) onPlayerUpdate,
+) {
+  final destination = "/topic/game/$gameCode/players";
 
-    // Subscribe only if connected
-    if (_isConnected) {
-      _stompClient.subscribe(
-        destination: destination,
-        callback: (frame) {
-          if (frame.body != null) {
-            final data = jsonDecode(frame.body!);
-            onPlayerUpdate(data);
+  if (_isConnected) {
+    _stompClient.subscribe(
+      destination: destination,
+      callback: (frame) {
+        try {
+          if (frame.body == null) {
+            print('Received empty frame body');
+            return;
           }
-        },
-      );
-    } else {
-      print('WebSocket not connected yet. Cannot subscribe to $destination');
-      // Optionally, queue subscription or throw error
-    }
+          
+          print('Raw message received: ${frame.body}');
+          final dynamic data = jsonDecode(frame.body!);
+          print('Parsed data: $data');
+          
+          if (data is List) {
+            onPlayerUpdate(List<Map<String, dynamic>>.from(data));
+          } else if (data is Map<String, dynamic>) {
+            if (data.containsKey('players') && data['players'] is List) {
+              onPlayerUpdate(List<Map<String, dynamic>>.from(data['players']));
+            } else {
+              print('Unexpected data structure: $data');
+            }
+          } else {
+            print('Received data of unexpected type: ${data.runtimeType}');
+          }
+        } catch (e, stack) {
+          print('Error processing player update: $e');
+          print(stack);
+        }
+      },
+    );
   }
-
+}
   void disconnect() {
     _stompClient.deactivate();
     _isConnected = false;

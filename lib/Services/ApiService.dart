@@ -19,36 +19,41 @@ class ApiService {
     _authService = authService;
   }
 
-  Future<bool> joinGame(String username, String gameCode) async {
-    final url = Uri.parse('$baseUrl/join/$gameCode'); 
+ Future<List<String>?> joinGame(String username, String gameCode) async {
+  final url = Uri.parse('$baseUrl/game/join/$gameCode');
+  print('Joining game: $gameCode as $username');
+  final body = jsonEncode({'id': username});
 
-    final body = jsonEncode({'id': username});
+  try {
+    final response = await http.post(
+      url,
+      headers: {'Content-Type': 'application/json'},
+      body: body,
+    );
+    print('Response: ${response.body}');
 
-    try {
-      final response = await http.post(
-        url,
-        headers: {'Content-Type': 'application/json'},
-        body: body,
-      );
+    if (response.statusCode == 200) {
+      final json = jsonDecode(response.body);
 
-      if (response.statusCode == 200) {
-        // Optionally parse response JSON for success status
-        final json = jsonDecode(response.body);
-        if (json['status'] == 'SUCCESS') {
-          return true;
-        } else {
-          print('Join game failed: ${json['message']}');
-          return false;
-        }
-      } else {
-        print('Failed with status code: ${response.statusCode}');
-        return false;
+      final players = json["players"];
+      if (players is List) {
+        return players
+            .map((e) => e["id"]?.toString())
+            .whereType<String>() // Filters out nulls
+            .toList();
       }
-    } catch (e) {
-      print('Exception during joinGame: $e');
-      return false;
+    } else {
+      print('Failed with status code: ${response.statusCode}');
     }
+  } catch (e) {
+    print('Exception during joinGame: $e');
   }
+
+  return null;
+}
+
+
+
 
   Future<String?> createGame(String username) async {
     final url = Uri.parse('$baseUrl/game/create'); // your endpoint
