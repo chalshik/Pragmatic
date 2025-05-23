@@ -21,7 +21,7 @@ class _DeckDialogState extends State<DeckDialog> {
     final selectedDeckProvider = Provider.of<SelectedDeckProvider>(context, listen: false);
     Deck? globallySelected = selectedDeckProvider.selectedDeck;
 
-    if (globallySelected != null && widget.decks.any((d) => d.id == globallySelected!.id)) {
+    if (widget.decks.any((d) => d.id == globallySelected!.id)) {
       _selectedDeck = widget.decks.firstWhere((d) => d.id == globallySelected!.id);
     } else if (widget.decks.isNotEmpty) {
       _selectedDeck = widget.decks.first;

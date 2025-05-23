@@ -12,8 +12,8 @@ class CardReviewScreen extends StatefulWidget {
   const CardReviewScreen({
     required this.deckId,
     required this.apiService,
-    Key? key,
-  }) : super(key: key);
+    super.key,
+  });
 
   @override
   _CardReviewScreenState createState() => _CardReviewScreenState();

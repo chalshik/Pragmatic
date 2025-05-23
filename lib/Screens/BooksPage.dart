@@ -25,7 +25,7 @@ class BookData {
 }
 
 class _BooksPageState extends State<BooksPage> {
-  List<BookData> _books = [];
+  final List<BookData> _books = [];
   bool _isLoading = true;
 
   @override

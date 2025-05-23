@@ -9,10 +9,8 @@ import 'package:pragmatic/Models/Review.dart';
 import 'package:pragmatic/Models/WordEntry.dart';
 
 class ApiService {
-  // Update this to your development machine's IP address or your API endpoint
-  // final String baseUrl = 'http://10.0.2.2';  // Use this for Android emulator
   final String baseUrl =
-      'https://specific-backend-production.up.railway.app'; // Local development
+      'https://specific-backend-production.up.railway.app'; 
   AuthService? _authService;
 
   ApiService();
@@ -21,10 +19,8 @@ class ApiService {
     _authService = authService;
   }
 
-  // Helper methods for auth that handle the case where _authService is not initialized
-
   Future<bool> joinGame(String username, String gameCode) async {
-    final url = Uri.parse('$baseUrl/join/$gameCode'); // corrected endpoint
+    final url = Uri.parse('$baseUrl/join/$gameCode'); 
 
     final body = jsonEncode({'id': username});
 
@@ -65,9 +61,9 @@ class ApiService {
     );
 
     if (response.statusCode == 201) {
-      final Map<String, String> roomCode = jsonDecode(response.body);
+      final Map<String, dynamic> roomCode = jsonDecode(response.body);
       print(roomCode["roomCode"]);
-      return roomCode["roomCode"];
+      return roomCode["roomCode"] as String?;
     } else {
       print('Error creating game: ${response.statusCode} - ${response.body}');
       return null;
@@ -238,7 +234,7 @@ class ApiService {
     String processedBack = back;
     if (back.length > 250) {
       // Cut off at 247 characters and add "..." to indicate truncation
-      processedBack = back.substring(0, 247) + "...";
+      processedBack = "${back.substring(0, 247)}...";
       print(
         '⚠️ Back content exceeded 250 characters. Truncated to: $processedBack',
       );
