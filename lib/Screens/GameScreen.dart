@@ -1,6 +1,7 @@
 
 
 import 'package:flutter/material.dart';
+import 'package:pragmatic/Models/Question.dart';
 import 'package:pragmatic/Services/ApiService.dart';
 import 'package:pragmatic/Services/WebSocketService.dart';
 
@@ -22,6 +23,7 @@ class _GameScreenState extends State<GameScreen> {
   final ApiService _apiService = ApiService();
   
   // State variables
+  Question? currentQuestion;
   String? gameCode;
   List<String> players = [];
   bool isCreatingGame = false;
@@ -159,21 +161,30 @@ class _GameScreenState extends State<GameScreen> {
 
   // Helper method to subscribe to player updates via WebSocket
 void _subscribeToPlayerUpdates(String code) {
+  // 🔁 Subscribe to player updates
   _webSocketService.subscribeToPlayerUpdates(code, (playerData) {
     print("Players raw data in room $code updated: $playerData");
     try {
       setState(() {
-        
         players = parsePlayersFromData(playerData);
         print("players type: ${players.runtimeType}, contents: $players");
 
-        readyToStart = players.length >1;
-       
+        readyToStart = players.length > 1;
       });
     } catch (e, stack) {
       print("Error parsing or setting players: $e");
       print(stack);
     }
+  });
+
+  // ❓ Subscribe to question updates
+  _webSocketService.subscribeToQuestionUpdates(code, (question) {
+    print("Received question: ${question.question}");
+
+    setState(() {
+      currentQuestion = question;
+      // Optionally reset answer UI state, etc.
+    });
   });
 }
 
@@ -245,12 +256,7 @@ void _subscribeToPlayerUpdates(String code) {
         const SizedBox(height: 20),
         ElevatedButton(
           onPressed: readyToStart ?  () {
-           ScaffoldMessenger.of(context).showSnackBar(
-  SnackBar(
-    content: Text('Game Started!'),
-    duration: Duration(seconds: 2),
-  ),
-);
+           _apiService.startGame(gameCode);
           } : null,
            style: ElevatedButton.styleFrom(
     minimumSize: const Size(double.infinity, 50),

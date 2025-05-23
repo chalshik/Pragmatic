@@ -52,8 +52,32 @@ class ApiService {
   return null;
 }
 
+  Future<bool> startGame(String? gameCode) async {
+  final url = Uri.parse('$baseUrl/game/start/$gameCode'); // Correct endpoint for starting game
+  try {
+    final response = await http.post(
+      url,
+      headers: {'Content-Type': 'application/json'},
+    );
 
-
+    if (response.statusCode == 200) {
+      // Optionally check the response body for success message
+      final json = jsonDecode(response.body);
+      if (json['status'] == 'success' || json['message'] == 'Game started successfully') {
+        return true;
+      } else {
+        print('Failed to start game: ${response.body}');
+        return false;
+      }
+    } else {
+      print('Failed to start game with status code: ${response.statusCode}');
+      return false;
+    }
+  } catch (e) {
+    print('Exception during startGame: $e');
+    return false;
+  }
+}
 
   Future<String?> createGame(String username) async {
     final url = Uri.parse('$baseUrl/game/create'); // your endpoint

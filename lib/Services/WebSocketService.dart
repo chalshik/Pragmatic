@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'package:stomp_dart_client/stomp_dart_client.dart';
 import 'package:pragmatic/Services/AuthService.dart';
-
+import '../Models/Question.dart';
 class WebSocketService {
   late StompClient _stompClient;
   bool _isConnected = false;
@@ -90,6 +90,23 @@ class WebSocketService {
 
     _stompClient.send(destination: destination, body: body, headers: headers);
   }
+  void subscribeToQuestionUpdates(String gameCode, Function(Question) onQuestionReceived) {
+  final destination = "/topic/game/$gameCode/questions";
+
+  if (_isConnected) {
+    _stompClient.subscribe(
+      destination: destination,
+      callback: (frame) {
+        if (frame.body != null) {
+          final data = jsonDecode(frame.body!);
+          print(data);
+          final question = Question.fromJson(data);
+          onQuestionReceived(question);
+        }
+      },
+    );
+  }
+}
 
   void subscribeToPlayerUpdates(
   String? gameCode,
