@@ -66,8 +66,10 @@ class _GameScreenState extends State<GameScreen> {
         const SnackBar(content: Text("Please enter a username"))
       );
       setState(() => isCreatingGame = false);
+
       return;
     }
+    
 
     final String? createdGameCode = await _apiService.createGame(username);
     
