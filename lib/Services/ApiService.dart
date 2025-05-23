@@ -63,7 +63,8 @@ class ApiService {
     if (response.statusCode == 201) {
       final Map<String, dynamic> roomCode = jsonDecode(response.body);
       
-      print(response.body);
+      
+      
       return roomCode["gameCode"] as String?;
     } else {
       print('Error creating game: ${response.statusCode} - ${response.body}');

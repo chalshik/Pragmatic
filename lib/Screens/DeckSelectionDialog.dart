@@ -20,6 +20,7 @@ class _DeckDialogState extends State<DeckDialog> {
     super.initState();
     final selectedDeckProvider = Provider.of<SelectedDeckProvider>(context, listen: false);
     Deck? globallySelected = selectedDeckProvider.selectedDeck;
+    
 
     if (widget.decks.any((d) => d.id == globallySelected!.id)) {
       _selectedDeck = widget.decks.firstWhere((d) => d.id == globallySelected!.id);
@@ -32,7 +33,11 @@ class _DeckDialogState extends State<DeckDialog> {
 
   @override
   Widget build(BuildContext context) {
+    print("reached here ");
     if (widget.decks.isEmpty) {
+      
+      
+      
       return AlertDialog(
         title: const Text('No Decks'),
         content: const Text('There are no decks available to select.'),
@@ -44,7 +49,7 @@ class _DeckDialogState extends State<DeckDialog> {
         ],
       );
     }
-
+    
     return AlertDialog(
       title: const Text('Set Default Deck'),
       content: DropdownButton<Deck>(
