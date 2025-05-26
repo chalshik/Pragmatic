@@ -80,32 +80,79 @@ class _DecksScreenState extends State<DecksScreen> {
     return showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Create Deck'),
-        content: TextField(
-          controller: nameController,
-          decoration: const InputDecoration(
-            labelText: 'Deck Name',
-            border: OutlineInputBorder(),
-          ),
-          autofocus: true,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              final name = nameController.text.trim();
-              if (name.isEmpty) {
-                _showErrorSnackBar('Deck name is required');
-                return;
-              }
-              Navigator.pop(context, name);
-            },
-            child: const Text('Create'),
-          ),
-        ],
+        contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.style, color: Colors.blue.shade600, size: 28),
+                const SizedBox(width: 12),
+                Text(
+                  'Create New Deck',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.blue.shade700,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            TextField(
+              controller: nameController,
+              decoration: InputDecoration(
+                labelText: 'Deck Name',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: Colors.blue.shade400, width: 2),
+                ),
+                prefixIcon: const Icon(Icons.edit),
+              ),
+              autofocus: true,
+            ),
+            const SizedBox(height: 24),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: Text(
+                    'Cancel',
+                    style: TextStyle(color: Colors.grey.shade600),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                ElevatedButton(
+                  onPressed: () {
+                    final name = nameController.text.trim();
+                    if (name.isEmpty) {
+                      _showErrorSnackBar('Deck name is required');
+                      return;
+                    }
+                    Navigator.pop(context, name);
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Text('Create'),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -159,22 +206,61 @@ class _DecksScreenState extends State<DecksScreen> {
     return await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Delete Deck'),
-        content: const Text('Are you sure you want to delete this deck? This action cannot be undone.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-              foregroundColor: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        contentPadding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.warning_amber_rounded, color: Colors.red.shade600, size: 28),
+                const SizedBox(width: 12),
+                Text(
+                  'Delete Deck',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.red.shade700,
+                  ),
+                ),
+              ],
             ),
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Delete'),
-          ),
-        ],
+            const SizedBox(height: 20),
+            const Text(
+              'Are you sure you want to delete this deck? This action cannot be undone.',
+              style: TextStyle(fontSize: 16),
+            ),
+            const SizedBox(height: 24),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  child: Text(
+                    'Cancel',
+                    style: TextStyle(color: Colors.grey.shade600),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                ElevatedButton(
+                  onPressed: () => Navigator.pop(context, true),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.red,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Text('Delete'),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     ) ?? false;
   }
@@ -254,14 +340,9 @@ class _DecksScreenState extends State<DecksScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('My Decks'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.settings),
-            onPressed: _showDeckSelectionDialog,
-            tooltip: 'Set Default Deck',
-          ),
-        ],
+        centerTitle: true,
+        elevation: 0,
+        backgroundColor: Colors.transparent,
       ),
       body: RefreshIndicator(
         onRefresh: _loadDecks,
@@ -305,22 +386,137 @@ class _DecksScreenState extends State<DecksScreen> {
       );
     }
 
-    return ListView.separated(
+    return GridView.builder(
+      padding: const EdgeInsets.all(16),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        childAspectRatio: 0.85,
+        crossAxisSpacing: 16,
+        mainAxisSpacing: 16,
+      ),
       itemCount: _decks.length,
-      separatorBuilder: (_, __) => const Divider(height: 1),
       itemBuilder: (context, index) {
         final deck = _decks[index];
-        return ListTile(
-          title: Text(deck.title),// Assuming Deck has cardCount
-          trailing: _isLoading 
-            ? const SizedBox(
-                width: 16,
-                height: 16,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              )
-            : null,
-          onTap: () => _navigateToCardReview(deck),
-          onLongPress: () => _showDeckActionsDialog(deck),
+        final isSelected = deck.id == _selectedDeck?.id;
+        
+        return AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeInOut,
+          decoration: BoxDecoration(
+            color: isSelected ? Colors.blue.shade50 : Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: isSelected ? Colors.blue : Colors.grey.shade300,
+              width: isSelected ? 2 : 1,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: isSelected 
+                  ? Colors.blue.withOpacity(0.2)
+                  : Colors.grey.withOpacity(0.1),
+                blurRadius: 8,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () => _navigateToCardReview(deck),
+              onLongPress: () => _showDeckActionsDialog(deck),
+              borderRadius: BorderRadius.circular(16),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.style,
+                          color: isSelected ? Colors.blue : Colors.grey.shade600,
+                          size: 28,
+                        ),
+                        if (isSelected) ...[
+                          const SizedBox(width: 4),
+                          Icon(
+                            Icons.check_circle,
+                            color: Colors.blue,
+                            size: 16,
+                          ),
+                        ],
+                        const Spacer(),
+                        PopupMenuButton<String>(
+                          icon: Icon(
+                            Icons.more_vert,
+                            color: isSelected ? Colors.blue : Colors.grey.shade600,
+                          ),
+                          onSelected: (value) {
+                            if (value == 'delete') {
+                              _deleteDeck(deck.id);
+                            } else if (value == 'select') {
+                              setState(() => _selectedDeck = deck);
+                              context.read<SelectedDeckProvider>().selectDeck(deck);
+                              _showSuccessSnackBar('${deck.title} is now the default deck');
+                            }
+                          },
+                          itemBuilder: (context) => [
+                            PopupMenuItem(
+                              value: 'select',
+                              child: ListTile(
+                                leading: const Icon(Icons.check_circle_outline),
+                                title: const Text('Set as Default'),
+                                contentPadding: EdgeInsets.zero,
+                                visualDensity: VisualDensity.compact,
+                              ),
+                            ),
+                            PopupMenuItem(
+                              value: 'delete',
+                              child: ListTile(
+                                leading: const Icon(Icons.delete_outline, color: Colors.red),
+                                title: const Text('Delete', style: TextStyle(color: Colors.red)),
+                                contentPadding: EdgeInsets.zero,
+                                visualDensity: VisualDensity.compact,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      deck.title,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                        color: isSelected ? Colors.blue.shade700 : Colors.black87,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const Spacer(),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Tap to review',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: isSelected ? Colors.blue.shade600 : Colors.grey.shade600,
+                          ),
+                        ),
+                        Icon(
+                          Icons.arrow_forward,
+                          size: 16,
+                          color: isSelected ? Colors.blue.shade600 : Colors.grey.shade600,
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
         );
       },
     );
