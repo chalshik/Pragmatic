@@ -180,7 +180,6 @@ class _GameProcessState extends State<GameProcess> {
         centerTitle: true,
         backgroundColor: Theme.of(context).colorScheme.primary,
         foregroundColor: Colors.white,
-        automaticallyImplyLeading: false, // Remove back button to avoid Hero conflicts
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
