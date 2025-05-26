@@ -5,6 +5,7 @@ import 'package:pragmatic/Screens/GameProcess.dart';
 import 'package:pragmatic/Services/ApiService.dart';
 import 'package:pragmatic/Services/WebSocketService.dart';
 import 'package:provider/provider.dart';
+import 'dart:async';
 
 class GameScreen extends StatefulWidget {
   const GameScreen({super.key});
@@ -31,8 +32,11 @@ class _GameScreenState extends State<GameScreen> {
   bool isJoiningGame = false;
   bool isInLobby = false;
   String? currentUsername;
+  String? gameCreator; // Track who created the game
   bool readyToStart = false;
   bool isStartingGame = false;
+  bool isWaitingForFirstQuestion = false;
+  bool isCreateMode = true; // Toggle between create and join modes
 
   @override
   void initState() {
@@ -100,6 +104,7 @@ class _GameScreenState extends State<GameScreen> {
           isInLobby = true;
           players = [username]; // Add creator to the initial players list
           readyToStart = false; // Creator needs to wait for other players
+          gameCreator = username;
         });
         
         // Subscribe to player updates
@@ -162,7 +167,7 @@ class _GameScreenState extends State<GameScreen> {
   }
 
   // Helper method to subscribe to player updates via WebSocket
-  void _subscribeToPlayerUpdates(String code) {
+  void _subscribeToPlayerUpdates(String code, {bool subscribeToQuestions = true}) {
     // Subscribe to player updates
     _webSocketService.subscribeToPlayerUpdates(code, (List<Map<String, dynamic>> playerData) {
       print("Players raw data in room $code updated: $playerData");
@@ -180,28 +185,44 @@ class _GameScreenState extends State<GameScreen> {
       }
     });
 
-    // Subscribe to question updates
-    _webSocketService.subscribeToQuestionUpdates(code, (question) {
-      print("Received question: ${question.question}");
+    // Subscribe to question updates for all players (not just the one who starts)
+    if (subscribeToQuestions) {
+      _webSocketService.subscribeToQuestionUpdates(code, (question) {
+        print("Received question in lobby: ${question.question}");
 
-      if (mounted) {
-        setState(() {
-          currentQuestion = question;
-        });
-        
-        // Safely update the provider with the new question
-        try {
-          // Check if we can access the context and the provider
-          if (mounted && context.mounted) {
-            final questionProvider = Provider.of<QuestionProvider>(context, listen: false);
-            questionProvider.setQuestion(question);
+        if (mounted) {
+          setState(() {
+            currentQuestion = question;
+            isWaitingForFirstQuestion = false;
+            isStartingGame = false;
+          });
+          
+          // Update the provider with the new question
+          try {
+            if (mounted && context.mounted) {
+              final questionProvider = Provider.of<QuestionProvider>(context, listen: false);
+              questionProvider.setQuestion(question);
+            }
+          } catch (e) {
+            print("Error setting question in provider: $e");
           }
-        } catch (e) {
-          print("Error setting question in provider: $e");
-          // Continue execution even if provider update fails
+          
+          // Automatically navigate ALL players to GameProcess when question arrives
+          if (isInLobby && currentUsername != null && gameCode != null) {
+            print("Auto-navigating to GameProcess for user: $currentUsername");
+            Navigator.pushReplacement(
+              context,
+              MaterialPageRoute(
+                builder: (context) => GameProcess(
+                  gameRoomCode: gameCode!, 
+                  username: currentUsername!
+                ),
+              ),
+            );
+          }
         }
-      }
-    });
+      });
+    }
   }
 
   // Helper method to show snack bar messages
@@ -220,65 +241,48 @@ class _GameScreenState extends State<GameScreen> {
     setState(() => isStartingGame = true);
     
     try {
+      // Start the game on the server
       final bool started = await _apiService.startGame(gameCode!);
       
       if (!mounted) return;
       
-      if (started) {
-        // Set the current question in the provider if we have one
-        if (currentQuestion != null && mounted) {
-          try {
-            final questionProvider = Provider.of<QuestionProvider>(context, listen: false);
-            questionProvider.setQuestion(currentQuestion!);
-          } catch (e) {
-            print("Error setting question in provider: $e");
-          }
-        }
-        
-        // Wait a moment for the question to be received
-        await Future.delayed(const Duration(milliseconds: 500));
-        
-        // Check if we received a question, if not wait a bit more
-        int attempts = 0;
-        while (currentQuestion == null && attempts < 10 && mounted) {
-          await Future.delayed(const Duration(milliseconds: 200));
-          attempts++;
-        }
-        
-        if (!mounted) return;
-        
-        // Set the question in provider again if we received it during waiting
-        if (currentQuestion != null && mounted) {
-          try {
-            final questionProvider = Provider.of<QuestionProvider>(context, listen: false);
-            questionProvider.setQuestion(currentQuestion!);
-          } catch (e) {
-            print("Error setting question in provider after waiting: $e");
-          }
-        }
-        
-        // Navigate to GameProcess regardless of whether we have a question
-        // The GameProcess screen will handle the loading state
-        if (mounted) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const GameProcess(),
-            ),
-          );
-        }
-      } else {
+      if (!started) {
+        setState(() {
+          isStartingGame = false;
+          isWaitingForFirstQuestion = false;
+        });
         _showSnackBar("Game could not be started. Please try again.");
+        return;
       }
+      
+      // Update state to show we're waiting for the first question
+      setState(() {
+        isStartingGame = false;
+        isWaitingForFirstQuestion = true;
+      });
+      
+      // Show loading state while waiting for first question
+      _showSnackBar("Game started! Waiting for first question...");
+      
+      // Set a timeout in case no question is received
+      Timer(const Duration(seconds: 15), () {
+        if (mounted && isWaitingForFirstQuestion) {
+          setState(() {
+            isWaitingForFirstQuestion = false;
+          });
+          _showSnackBar("Timeout waiting for question. Please try again.");
+        }
+      });
+      
     } catch (e) {
       print("Error starting game: $e");
       if (mounted) {
+        setState(() {
+          isStartingGame = false;
+          isWaitingForFirstQuestion = false;
+        });
         _showSnackBar("Error starting game: $e");
       }
-    }
-    
-    if (mounted) {
-      setState(() => isStartingGame = false);
     }
   }
 
@@ -289,8 +293,11 @@ class _GameScreenState extends State<GameScreen> {
       gameCode = null;
       players = [];
       currentUsername = null;
+      gameCreator = null; // Reset game creator
       currentQuestion = null;
       readyToStart = false;
+      isWaitingForFirstQuestion = false;
+      isCreateMode = true; // Reset to create mode
     });
     
     // Clear text controllers
@@ -303,11 +310,6 @@ class _GameScreenState extends State<GameScreen> {
   Widget _buildLobbyScreen() {
     return Column(
       children: [
-        const SizedBox(height: 20),
-        Text(
-          'Game Lobby',
-          style: Theme.of(context).textTheme.headlineMedium,
-        ),
         const SizedBox(height: 20),
         Container(
           padding: const EdgeInsets.all(16),
@@ -356,33 +358,105 @@ class _GameScreenState extends State<GameScreen> {
                     itemCount: players.length,
                     itemBuilder: (context, index) {
                       final player = players[index];
+                      final isCurrentUser = player == currentUsername;
+                      final isCreator = player == gameCreator;
+                      
                       return ListTile(
-                        leading: const Icon(Icons.person),
+                        leading: Icon(
+                          isCreator ? Icons.star : Icons.person,
+                          color: isCreator ? Colors.amber : null,
+                        ),
                         title: Text(
                           player,
                           style: TextStyle(
-                            fontWeight: player == currentUsername 
+                            fontWeight: isCurrentUser 
                                 ? FontWeight.bold 
                                 : FontWeight.normal,
                           ),
                         ),
-                        trailing: player == currentUsername 
-                            ? const Text('(You)', style: TextStyle(color: Colors.blue))
-                            : null,
+                        trailing: SizedBox(
+                          width: 120, // Fixed width to prevent overflow
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              if (isCreator) ...[
+                                const Flexible(
+                                  child: Text(
+                                    'Creator',
+                                    style: TextStyle(
+                                      color: Colors.amber,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 11,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                              ],
+                              if (isCurrentUser)
+                                const Flexible(
+                                  child: Text(
+                                    '(You)', 
+                                    style: TextStyle(
+                                      color: Colors.blue,
+                                      fontSize: 11,
+                                    ),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
                       );
                     },
                   ),
           ),
         ),
         const SizedBox(height: 20),
+        
+        // Show waiting for question indicator
+        if (isWaitingForFirstQuestion) ...[
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.orange.shade50,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.orange.shade200),
+            ),
+            child: const Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.orange,
+                  ),
+                ),
+                SizedBox(width: 12),
+                Text(
+                  'Game started! Waiting for first question...',
+                  style: TextStyle(
+                    color: Colors.orange,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 20),
+        ],
+        
         ElevatedButton(
-          onPressed: readyToStart && !isStartingGame ? _startGame : null,
+          onPressed: (currentUsername == gameCreator && readyToStart && !isStartingGame && !isWaitingForFirstQuestion) ? _startGame : null,
           style: ElevatedButton.styleFrom(
             minimumSize: const Size(double.infinity, 50),
-            backgroundColor: readyToStart ? Colors.green : Colors.grey,
+            backgroundColor: (currentUsername == gameCreator && readyToStart) ? Colors.green : Colors.grey,
             foregroundColor: Colors.white,
           ),
-          child: isStartingGame
+          child: (isStartingGame || isWaitingForFirstQuestion)
               ? const SizedBox(
                   height: 20,
                   width: 20,
@@ -392,7 +466,9 @@ class _GameScreenState extends State<GameScreen> {
                   ),
                 )
               : Text(
-                  readyToStart ? "Start Game" : "Waiting for Players",
+                  currentUsername == gameCreator
+                    ? (readyToStart ? "Start Game" : "Waiting for Players")
+                    : "Waiting for Game Creator to Start",
                   style: const TextStyle(fontSize: 18),
                 ),
         ),
@@ -407,126 +483,203 @@ class _GameScreenState extends State<GameScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const SizedBox(height: 20),
-          Text(
-            'Welcome to Game Lobby',
-            style: Theme.of(context).textTheme.headlineMedium,
-          ),
-          const SizedBox(height: 40),
+          const SizedBox(height: 30),
           
-          // Create Game Section
+          // Toggle Switch
           Container(
-            padding: const EdgeInsets.all(16),
+            width: double.infinity,
+            padding: const EdgeInsets.all(4),
             decoration: BoxDecoration(
-              color: Colors.blue.shade50,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.blue.shade200),
+              color: Colors.grey.shade200,
+              borderRadius: BorderRadius.circular(25),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Create a New Game',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: _createUsernameController,
-                  decoration: const InputDecoration(
-                    labelText: "Your Username",
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.person),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                ElevatedButton(
-                  onPressed: isCreatingGame ? null : onCreateGame,
-                  style: ElevatedButton.styleFrom(
-                    minimumSize: const Size(double.infinity, 50),
-                  ),
-                  child: isCreatingGame
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(
-                            color: Colors.white,
-                            strokeWidth: 3,
-                          ),
-                        )
-                      : const Text('Create Game'),
-                ),
-              ],
-            ),
-          ),
-
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 24),
             child: Row(
               children: [
-                Expanded(child: Divider()),
-                Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16),
-                  child: Text('OR', style: TextStyle(color: Colors.grey)),
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () => setState(() => isCreateMode = true),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      decoration: BoxDecoration(
+                        color: isCreateMode ? Colors.blue : Colors.transparent,
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: isCreateMode ? [
+                          BoxShadow(
+                            color: Colors.blue.withOpacity(0.3),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ] : [],
+                      ),
+                      child: Text(
+                        'Create Game',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: isCreateMode ? Colors.white : Colors.grey.shade600,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
                 ),
-                Expanded(child: Divider()),
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () => setState(() => isCreateMode = false),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      decoration: BoxDecoration(
+                        color: !isCreateMode ? Colors.green : Colors.transparent,
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: !isCreateMode ? [
+                          BoxShadow(
+                            color: Colors.green.withOpacity(0.3),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ] : [],
+                      ),
+                      child: Text(
+                        'Join Game',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: !isCreateMode ? Colors.white : Colors.grey.shade600,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
               ],
             ),
           ),
-
-          // Join Game Section
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.green.shade50,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.green.shade200),
+          
+          const SizedBox(height: 30),
+          
+          // Dynamic Content based on toggle with smooth transition
+          AnimatedSwitcher(
+            duration: const Duration(milliseconds: 400),
+            transitionBuilder: (Widget child, Animation<double> animation) {
+              return SlideTransition(
+                position: Tween<Offset>(
+                  begin: const Offset(0.3, 0),
+                  end: Offset.zero,
+                ).animate(CurvedAnimation(
+                  parent: animation,
+                  curve: Curves.easeInOut,
+                )),
+                child: FadeTransition(
+                  opacity: animation,
+                  child: child,
+                ),
+              );
+            },
+            child: isCreateMode ? _buildCreateGameSection() : _buildJoinGameSection(),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  // Create Game Section
+  Widget _buildCreateGameSection() {
+    return Container(
+      key: const ValueKey('create'),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.blue.shade50,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.blue.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          TextField(
+            controller: _createUsernameController,
+            decoration: const InputDecoration(
+              labelText: "Your Username",
+              border: OutlineInputBorder(),
+              prefixIcon: Icon(Icons.person),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Join an Existing Game',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: _joinUsernameController,
-                  decoration: const InputDecoration(
-                    labelText: "Your Username",
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.person),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: _gameCodeController,
-                  decoration: const InputDecoration(
-                    labelText: "Game Code",
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.code),
-                  ),
-                  textCapitalization: TextCapitalization.characters,
-                ),
-                const SizedBox(height: 16),
-                ElevatedButton(
-                  onPressed: isJoiningGame ? null : onJoinGame,
-                  style: ElevatedButton.styleFrom(
-                    minimumSize: const Size(double.infinity, 50),
-                    backgroundColor: Colors.green,
-                  ),
-                  child: isJoiningGame
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(
-                            color: Colors.white,
-                            strokeWidth: 3,
-                          ),
-                        )
-                      : const Text('Join Game'),
-                ),
-              ],
+          ),
+          const SizedBox(height: 16),
+          ElevatedButton(
+            onPressed: isCreatingGame ? null : onCreateGame,
+            style: ElevatedButton.styleFrom(
+              minimumSize: const Size(double.infinity, 50),
+              backgroundColor: Colors.blue,
             ),
+            child: isCreatingGame
+                ? const SizedBox(
+                    height: 20,
+                    width: 20,
+                    child: CircularProgressIndicator(
+                      color: Colors.white,
+                      strokeWidth: 3,
+                    ),
+                  )
+                : const Text(
+                    'Create Game',
+                    style: TextStyle(color: Colors.white),
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  // Join Game Section
+  Widget _buildJoinGameSection() {
+    return Container(
+      key: const ValueKey('join'),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.green.shade50,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.green.shade200),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          TextField(
+            controller: _joinUsernameController,
+            decoration: const InputDecoration(
+              labelText: "Your Username",
+              border: OutlineInputBorder(),
+              prefixIcon: Icon(Icons.person),
+            ),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _gameCodeController,
+            decoration: const InputDecoration(
+              labelText: "Game Code",
+              border: OutlineInputBorder(),
+              prefixIcon: Icon(Icons.code),
+            ),
+            textCapitalization: TextCapitalization.characters,
+          ),
+          const SizedBox(height: 16),
+          ElevatedButton(
+            onPressed: isJoiningGame ? null : onJoinGame,
+            style: ElevatedButton.styleFrom(
+              minimumSize: const Size(double.infinity, 50),
+              backgroundColor: Colors.green,
+            ),
+            child: isJoiningGame
+                ? const SizedBox(
+                    height: 20,
+                    width: 20,
+                    child: CircularProgressIndicator(
+                      color: Colors.white,
+                      strokeWidth: 3,
+                    ),
+                  )
+                : const Text(
+                    'Join Game',
+                    style: TextStyle(color: Colors.white),
+                  ),
           ),
         ],
       ),
@@ -537,7 +690,6 @@ class _GameScreenState extends State<GameScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Game Lobby'),
         centerTitle: true,
         // Add a back button when in lobby to return to the setup screen
         leading: isInLobby
