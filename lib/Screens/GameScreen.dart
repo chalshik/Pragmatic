@@ -1,9 +1,10 @@
-
-
 import 'package:flutter/material.dart';
 import 'package:pragmatic/Models/Question.dart';
+import 'package:pragmatic/Providers/QuestionProvider.dart';
+import 'package:pragmatic/Screens/GameProcess.dart';
 import 'package:pragmatic/Services/ApiService.dart';
 import 'package:pragmatic/Services/WebSocketService.dart';
+import 'package:provider/provider.dart';
 
 class GameScreen extends StatefulWidget {
   const GameScreen({super.key});
@@ -31,6 +32,7 @@ class _GameScreenState extends State<GameScreen> {
   bool isInLobby = false;
   String? currentUsername;
   bool readyToStart = false;
+  bool isStartingGame = false;
 
   @override
   void initState() {
@@ -47,34 +49,33 @@ class _GameScreenState extends State<GameScreen> {
     super.dispose();
   }
 
- List<String> parsePlayersFromData(dynamic playerData) {
-  try {
-    print("Parsing playerData: $playerData (type: ${playerData.runtimeType})");
+  List<String> parsePlayersFromData(dynamic playerData) {
+    try {
+      print("Parsing playerData: $playerData (type: ${playerData.runtimeType})");
 
-    if (playerData is List) {
-      return playerData.map((e) {
-        if (e is Map<String, dynamic>) {
-          return e['id']?.toString() ?? e['username']?.toString() ?? 'Unknown';
-        }
-        return e.toString();
-      }).toList();
-    }
-
-    if (playerData is Map<String, dynamic>) {
-      if (playerData.containsKey('players') && playerData['players'] is List) {
-        return parsePlayersFromData(playerData['players']);
+      if (playerData is List) {
+        return playerData.map((e) {
+          if (e is Map<String, dynamic>) {
+            return e['id']?.toString() ?? e['username']?.toString() ?? 'Unknown';
+          }
+          return e.toString();
+        }).toList();
       }
-      return [playerData['id']?.toString() ?? 'Unknown'];
+
+      if (playerData is Map<String, dynamic>) {
+        if (playerData.containsKey('players') && playerData['players'] is List) {
+          return parsePlayersFromData(playerData['players']);
+        }
+        return [playerData['id']?.toString() ?? 'Unknown'];
+      }
+
+      return [playerData.toString()];
+    } catch (e, stack) {
+      print("Error parsing players: $e");
+      print(stack);
+      return [];
     }
-
-    return [playerData.toString()];
-  } catch (e, stack) {
-    print("Error parsing players: $e");
-    print(stack);
-    return [];
   }
-}
-
 
   // Method to handle creating a new game
   void onCreateGame() async {
@@ -84,29 +85,31 @@ class _GameScreenState extends State<GameScreen> {
     
     final String username = _createUsernameController.text.trim();
     if (username.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please enter a username"))
-      );
+      _showSnackBar("Please enter a username");
       setState(() => isCreatingGame = false);
       return;
     }
 
-    final String? createdGameCode = await _apiService.createGame(username);
-    
-    if (createdGameCode != null) {
-      setState(() {
-        gameCode = createdGameCode;
-        currentUsername = username;
-        isInLobby = true;
-        players = [username]; // Add creator to the initial players list
-      });
+    try {
+      final String? createdGameCode = await _apiService.createGame(username);
       
-      // Subscribe to player updates
-      _subscribeToPlayerUpdates(createdGameCode);
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Failed to create game"))
-      );
+      if (createdGameCode != null) {
+        setState(() {
+          gameCode = createdGameCode;
+          currentUsername = username;
+          isInLobby = true;
+          players = [username]; // Add creator to the initial players list
+          readyToStart = false; // Creator needs to wait for other players
+        });
+        
+        // Subscribe to player updates
+        _subscribeToPlayerUpdates(createdGameCode);
+      } else {
+        _showSnackBar("Failed to create game");
+      }
+    } catch (e) {
+      print("Error creating game: $e");
+      _showSnackBar("Failed to create game: $e");
     }
     
     setState(() => isCreatingGame = false);
@@ -122,72 +125,179 @@ class _GameScreenState extends State<GameScreen> {
     final String joinCode = _gameCodeController.text.trim().toUpperCase();
     
     if (username.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please enter a username"))
-      );
+      _showSnackBar("Please enter a username");
       setState(() => isJoiningGame = false);
       return;
     }
     
     if (joinCode.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please enter a game code"))
-      );
+      _showSnackBar("Please enter a game code");
       setState(() => isJoiningGame = false);
       return;
     }
 
-    final List<String>? joinedRoom = await _apiService.joinGame(username, joinCode);
-    
-    if (joinedRoom != null) {
-      setState(() {
-        gameCode = joinCode;
-        currentUsername = username;
-        isInLobby = true;
-        players = joinedRoom;
-        readyToStart = players.length >1;
-      });
+    try {
+      final List<String>? joinedRoom = await _apiService.joinGame(username, joinCode);
       
-      // Subscribe to player updates
-      _subscribeToPlayerUpdates(joinCode);
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Failed to join game"))
-      );
+      if (joinedRoom != null) {
+        setState(() {
+          gameCode = joinCode;
+          currentUsername = username;
+          isInLobby = true;
+          players = joinedRoom;
+          readyToStart = players.length > 1;
+        });
+        
+        // Subscribe to player updates
+        _subscribeToPlayerUpdates(joinCode);
+      } else {
+        _showSnackBar("Failed to join game");
+      }
+    } catch (e) {
+      print("Error joining game: $e");
+      _showSnackBar("Failed to join game: $e");
     }
     
     setState(() => isJoiningGame = false);
   }
 
   // Helper method to subscribe to player updates via WebSocket
-void _subscribeToPlayerUpdates(String code) {
-  // 🔁 Subscribe to player updates
-  _webSocketService.subscribeToPlayerUpdates(code, (playerData) {
-    print("Players raw data in room $code updated: $playerData");
-    try {
-      setState(() {
-        players = parsePlayersFromData(playerData);
-        print("players type: ${players.runtimeType}, contents: $players");
-
-        readyToStart = players.length > 1;
-      });
-    } catch (e, stack) {
-      print("Error parsing or setting players: $e");
-      print(stack);
-    }
-  });
-
-  // ❓ Subscribe to question updates
-  _webSocketService.subscribeToQuestionUpdates(code, (question) {
-    print("Received question: ${question.question}");
-
-    setState(() {
-      currentQuestion = question;
-      // Optionally reset answer UI state, etc.
+  void _subscribeToPlayerUpdates(String code) {
+    // Subscribe to player updates
+    _webSocketService.subscribeToPlayerUpdates(code, (List<Map<String, dynamic>> playerData) {
+      print("Players raw data in room $code updated: $playerData");
+      try {
+        if (mounted) {
+          setState(() {
+            players = parsePlayersFromData(playerData);
+            print("players type: ${players.runtimeType}, contents: $players");
+            readyToStart = players.length > 1;
+          });
+        }
+      } catch (e, stack) {
+        print("Error parsing or setting players: $e");
+        print(stack);
+      }
     });
-  });
-}
 
+    // Subscribe to question updates
+    _webSocketService.subscribeToQuestionUpdates(code, (question) {
+      print("Received question: ${question.question}");
+
+      if (mounted) {
+        setState(() {
+          currentQuestion = question;
+        });
+        
+        // Safely update the provider with the new question
+        try {
+          // Check if we can access the context and the provider
+          if (mounted && context.mounted) {
+            final questionProvider = Provider.of<QuestionProvider>(context, listen: false);
+            questionProvider.setQuestion(question);
+          }
+        } catch (e) {
+          print("Error setting question in provider: $e");
+          // Continue execution even if provider update fails
+        }
+      }
+    });
+  }
+
+  // Helper method to show snack bar messages
+  void _showSnackBar(String message) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message))
+      );
+    }
+  }
+
+  // Method to handle starting the game
+  void _startGame() async {
+    if (isStartingGame || gameCode == null) return;
+    
+    setState(() => isStartingGame = true);
+    
+    try {
+      final bool started = await _apiService.startGame(gameCode!);
+      
+      if (!mounted) return;
+      
+      if (started) {
+        // Set the current question in the provider if we have one
+        if (currentQuestion != null && mounted) {
+          try {
+            final questionProvider = Provider.of<QuestionProvider>(context, listen: false);
+            questionProvider.setQuestion(currentQuestion!);
+          } catch (e) {
+            print("Error setting question in provider: $e");
+          }
+        }
+        
+        // Wait a moment for the question to be received
+        await Future.delayed(const Duration(milliseconds: 500));
+        
+        // Check if we received a question, if not wait a bit more
+        int attempts = 0;
+        while (currentQuestion == null && attempts < 10 && mounted) {
+          await Future.delayed(const Duration(milliseconds: 200));
+          attempts++;
+        }
+        
+        if (!mounted) return;
+        
+        // Set the question in provider again if we received it during waiting
+        if (currentQuestion != null && mounted) {
+          try {
+            final questionProvider = Provider.of<QuestionProvider>(context, listen: false);
+            questionProvider.setQuestion(currentQuestion!);
+          } catch (e) {
+            print("Error setting question in provider after waiting: $e");
+          }
+        }
+        
+        // Navigate to GameProcess regardless of whether we have a question
+        // The GameProcess screen will handle the loading state
+        if (mounted) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const GameProcess(),
+            ),
+          );
+        }
+      } else {
+        _showSnackBar("Game could not be started. Please try again.");
+      }
+    } catch (e) {
+      print("Error starting game: $e");
+      if (mounted) {
+        _showSnackBar("Error starting game: $e");
+      }
+    }
+    
+    if (mounted) {
+      setState(() => isStartingGame = false);
+    }
+  }
+
+  // Method to leave the lobby
+  void _leaveLobby() {
+    setState(() {
+      isInLobby = false;
+      gameCode = null;
+      players = [];
+      currentUsername = null;
+      currentQuestion = null;
+      readyToStart = false;
+    });
+    
+    // Clear text controllers
+    _createUsernameController.clear();
+    _joinUsernameController.clear();
+    _gameCodeController.clear();
+  }
 
   // UI for the game lobby screen
   Widget _buildLobbyScreen() {
@@ -215,6 +325,7 @@ void _subscribeToPlayerUpdates(String code) {
                   fontWeight: FontWeight.bold
                 ),
               ),
+              const SizedBox(height: 8),
               const Text('Share this code with friends to join'),
             ],
           ),
@@ -231,40 +342,61 @@ void _subscribeToPlayerUpdates(String code) {
               border: Border.all(color: Colors.grey.shade300),
               borderRadius: BorderRadius.circular(8),
             ),
-            child: ListView.builder(
-              itemCount: players.length,
-              itemBuilder: (context, index) {
-                final player = players[index];
-                return ListTile(
-                  leading: const Icon(Icons.person),
-                  title: Text(
-                    player,
-                    style: TextStyle(
-                      fontWeight: player == currentUsername 
-                          ? FontWeight.bold 
-                          : FontWeight.normal,
+            child: players.isEmpty
+                ? const Center(
+                    child: Text(
+                      'Waiting for players...',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Colors.grey,
+                      ),
                     ),
+                  )
+                : ListView.builder(
+                    itemCount: players.length,
+                    itemBuilder: (context, index) {
+                      final player = players[index];
+                      return ListTile(
+                        leading: const Icon(Icons.person),
+                        title: Text(
+                          player,
+                          style: TextStyle(
+                            fontWeight: player == currentUsername 
+                                ? FontWeight.bold 
+                                : FontWeight.normal,
+                          ),
+                        ),
+                        trailing: player == currentUsername 
+                            ? const Text('(You)', style: TextStyle(color: Colors.blue))
+                            : null,
+                      );
+                    },
                   ),
-                  trailing: player == currentUsername 
-                      ? const Text('(You)', style: TextStyle(color: Colors.blue))
-                      : null,
-                );
-              },
-            ),
           ),
         ),
         const SizedBox(height: 20),
         ElevatedButton(
-          onPressed: readyToStart ?  () {
-           _apiService.startGame(gameCode);
-          } : null,
-           style: ElevatedButton.styleFrom(
-    minimumSize: const Size(double.infinity, 50),
-    backgroundColor: readyToStart ? Colors.green : Colors.grey,
-    foregroundColor: Colors.white, // text color
-  ),
-          child:   Text( readyToStart ? "Start game": "Waiting to players", style: TextStyle(fontSize: 18)),
+          onPressed: readyToStart && !isStartingGame ? _startGame : null,
+          style: ElevatedButton.styleFrom(
+            minimumSize: const Size(double.infinity, 50),
+            backgroundColor: readyToStart ? Colors.green : Colors.grey,
+            foregroundColor: Colors.white,
+          ),
+          child: isStartingGame
+              ? const SizedBox(
+                  height: 20,
+                  width: 20,
+                  child: CircularProgressIndicator(
+                    color: Colors.white,
+                    strokeWidth: 3,
+                  ),
+                )
+              : Text(
+                  readyToStart ? "Start Game" : "Waiting for Players",
+                  style: const TextStyle(fontSize: 18),
+                ),
         ),
+        const SizedBox(height: 10),
       ],
     );
   }
@@ -308,7 +440,7 @@ void _subscribeToPlayerUpdates(String code) {
                 ),
                 const SizedBox(height: 16),
                 ElevatedButton(
-                  onPressed: onCreateGame,
+                  onPressed: isCreatingGame ? null : onCreateGame,
                   style: ElevatedButton.styleFrom(
                     minimumSize: const Size(double.infinity, 50),
                   ),
@@ -377,7 +509,7 @@ void _subscribeToPlayerUpdates(String code) {
                 ),
                 const SizedBox(height: 16),
                 ElevatedButton(
-                  onPressed: onJoinGame,
+                  onPressed: isJoiningGame ? null : onJoinGame,
                   style: ElevatedButton.styleFrom(
                     minimumSize: const Size(double.infinity, 50),
                     backgroundColor: Colors.green,
@@ -411,14 +543,7 @@ void _subscribeToPlayerUpdates(String code) {
         leading: isInLobby
             ? IconButton(
                 icon: const Icon(Icons.arrow_back),
-                onPressed: () {
-                  setState(() {
-                    isInLobby = false;
-                    gameCode = null;
-                    players = [];
-                    currentUsername = null;
-                  });
-                },
+                onPressed: _leaveLobby,
               )
             : null,
       ),

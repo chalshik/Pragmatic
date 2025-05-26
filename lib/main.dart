@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:pragmatic/Models/Question.dart';
+import 'package:pragmatic/Providers/QuestionProvider.dart';
 import 'firebase_options.dart';
 import 'package:pragmatic/Services/AuthService.dart';
 import 'package:pragmatic/Services/ApiService.dart';
@@ -26,6 +28,7 @@ void main() async {
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => SelectedDeckProvider()),
+        ChangeNotifierProvider(create: (_) => QuestionProvider()),
       ],
       child: MyApp(),
     ),
@@ -49,6 +52,7 @@ class MyApp extends StatelessWidget {
       providers: [
         Provider<AuthService>(create: (_) => authService),
         Provider<ApiService>(create: (_) => apiService),
+        // Removed duplicate QuestionProvider - it's already provided in main()
       ],
       child: MaterialApp(
         title: 'Pragmatic',
