@@ -1,4 +1,3 @@
-import 'EpubReaderScreen.dart';
 import 'package:flutter/material.dart';
 import 'dart:io';
 import 'dart:typed_data';
@@ -7,25 +6,57 @@ import 'package:file_picker/file_picker.dart';
 import 'package:pragmatic/Services/ApiService.dart';
 import 'package:pragmatic/Widgets/CustomUI.dart';
 import 'package:epubx/epubx.dart' hide Image;
+import 'EpubReaderScreen.dart';
 
-class BooksPage extends StatefulWidget {
-  final ApiService apiService;
-
-  const BooksPage({super.key, required this.apiService});
-  @override
-  _BooksPageState createState() => _BooksPageState();
-}
-
+// Model class with immutable properties and proper documentation
+/// Represents book data with file reference, title, and optional cover image
+@immutable
 class BookData {
+  const BookData({
+    required this.file,
+    required this.title,
+    this.coverImage,
+  });
+
   final File file;
   final String title;
   final Uint8List? coverImage;
 
-  BookData({required this.file, required this.title, this.coverImage});
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is BookData &&
+          runtimeType == other.runtimeType &&
+          file.path == other.file.path &&
+          title == other.title;
+
+  @override
+  int get hashCode => file.path.hashCode ^ title.hashCode;
+}
+
+/// A page that displays and manages EPUB books
+class BooksPage extends StatefulWidget {
+  const BooksPage({
+    super.key,
+    required this.apiService,
+  });
+
+  final ApiService apiService;
+
+  @override
+  State<BooksPage> createState() => _BooksPageState();
 }
 
 class _BooksPageState extends State<BooksPage> {
-  final List<BookData> _books = [];
+  static const List<String> _allowedExtensions = ['epub'];
+  static const List<String> _coverPatterns = ['cover', 'title'];
+  static const Duration _snackBarDuration = Duration(seconds: 3);
+  static const Duration _loadingSnackBarDuration = Duration(minutes: 5);
+  static const int _gridCrossAxisCount = 2;
+  static const double _gridSpacing = 16.0;
+  static const double _gridChildAspectRatio = 0.75;
+
+  final List<BookData> _books = <BookData>[];
   bool _isLoading = true;
 
   @override
@@ -34,344 +65,399 @@ class _BooksPageState extends State<BooksPage> {
     _loadBooks();
   }
 
+  /// Extracts book metadata from EPUB file
   Future<BookData> _extractBookData(File file) async {
     try {
-      // Read the EPUB file
-      List<int> bytes = await file.readAsBytes();
-      EpubBook epubBook = await EpubReader.readBook(bytes);
+      final List<int> bytes = await file.readAsBytes();
+      final EpubBook epubBook = await EpubReader.readBook(bytes);
 
-      // Extract title
-      String title =
-          epubBook.Title ?? _formatFileName(file.uri.pathSegments.last);
+      final String title = epubBook.Title?.isNotEmpty == true
+          ? epubBook.Title!
+          : _formatFileName(file.uri.pathSegments.last);
 
-      // Extract cover image
-      Uint8List? coverImage;
+      final Uint8List? coverImage = await _extractCoverImage(epubBook);
 
-      // Try to find cover image by looking at the images in the EPUB
-      if (epubBook.Content?.Images != null &&
-          epubBook.Content!.Images!.isNotEmpty) {
-        // Try to find a cover image by name convention
-        List<String> coverPatterns = ['cover', 'title'];
-
-        // First, try to find explicit cover image
-        for (var entry in epubBook.Content!.Images!.entries) {
-          String key = entry.key.toLowerCase();
-          if (coverPatterns.any((pattern) => key.contains(pattern))) {
-            if (entry.value.Content != null) {
-              coverImage = Uint8List.fromList(entry.value.Content!);
-              break;
-            }
-          }
-        }
-
-        // If we still don't have a cover, just use the first image
-        if (coverImage == null && epubBook.Content!.Images!.isNotEmpty) {
-          var firstImage = epubBook.Content!.Images!.entries.first.value;
-          if (firstImage.Content != null) {
-            coverImage = Uint8List.fromList(firstImage.Content!);
-          }
-        }
-      }
-
-      return BookData(file: file, title: title, coverImage: coverImage);
-    } catch (e, stack) {
-      print('Error extracting book data: $e');
-      print(stack);
-      // Return default book data if extraction fails
+      return BookData(
+        file: file,
+        title: title,
+        coverImage: coverImage,
+      );
+    } catch (e, stackTrace) {
+      debugPrint('Error extracting book data: $e');
+      debugPrint('Stack trace: $stackTrace');
+      
       return BookData(
         file: file,
         title: _formatFileName(file.uri.pathSegments.last),
-        coverImage: null,
       );
     }
   }
 
+  /// Extracts cover image from EPUB book
+  Future<Uint8List?> _extractCoverImage(EpubBook epubBook) async {
+    if (epubBook.Content?.Images == null || 
+        epubBook.Content!.Images!.isEmpty) {
+      return null;
+    }
+
+    // Try to find cover image by name convention
+    for (final entry in epubBook.Content!.Images!.entries) {
+      final String key = entry.key.toLowerCase();
+      if (_coverPatterns.any((pattern) => key.contains(pattern))) {
+        if (entry.value.Content != null) {
+          return Uint8List.fromList(entry.value.Content!);
+        }
+      }
+    }
+
+    // If no cover found, use first available image
+    final firstImage = epubBook.Content!.Images!.entries.first.value;
+    if (firstImage.Content != null) {
+      return Uint8List.fromList(firstImage.Content!);
+    }
+
+    return null;
+  }
+
+  /// Loads books from the documents directory
   Future<void> _loadBooks() async {
+    if (!mounted) return;
+
     setState(() {
       _isLoading = true;
     });
 
     try {
-      final directory = await getApplicationDocumentsDirectory();
-      final booksDir = Directory('${directory.path}/books');
-      if (await booksDir.exists()) {
-        final files = booksDir.listSync().whereType<File>().toList();
-
-        // Clear the current list
-        _books.clear();
-
-        // Process each file to extract book data
-        for (var file in files) {
-          BookData bookData = await _extractBookData(file);
-          _books.add(bookData);
-        }
-
-        setState(() {});
+      final Directory directory = await getApplicationDocumentsDirectory();
+      final Directory booksDir = Directory('${directory.path}/books');
+      
+      if (!await booksDir.exists()) {
+        setState(() {
+          _books.clear();
+          _isLoading = false;
+        });
+        return;
       }
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error loading books: $e'),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    } finally {
-      setState(() {
-        _isLoading = false;
-      });
-    }
-  }
 
-  Future<void> _addBook() async {
-    try {
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['epub'],
-      );
+      final List<File> files = booksDir
+          .listSync()
+          .whereType<File>()
+          .where((file) => file.path.toLowerCase().endsWith('.epub'))
+          .toList();
 
-      if (result != null && result.files.single.path != null) {
-        final directory = await getApplicationDocumentsDirectory();
-        final booksDir = Directory('${directory.path}/books');
+      _books.clear();
 
-        if (!await booksDir.exists()) {
-          await booksDir.create(recursive: true);
-        }
-
-        final file = File(result.files.single.path!);
-        final fileName = file.uri.pathSegments.last;
-
-        // Show loading indicator with indefinite duration
-        ScaffoldMessenger.of(
-          context,
-        ).clearSnackBars(); // Clear any existing snackbars
-
-        final loadingSnackBar = ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Row(
-              children: [
-                SizedBox(
-                  height: 20,
-                  width: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: Colors.white,
-                  ),
-                ),
-                SizedBox(width: 20),
-                Expanded(
-                  child: Text('Adding $fileName...'),
-                ),
-              ],
-            ),
-            duration: Duration(minutes: 5), // Much longer duration
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-
-        try {
-          // Copy file
-          final newFile = await file.copy('${booksDir.path}/$fileName');
-
-          // Extract book data
-          final bookData = await _extractBookData(newFile);
-
-          // Update state
-          if (mounted) {
-            // Check if widget is still mounted
-            setState(() {
-              _books.add(bookData);
-            });
-          }
-
-          // Hide loading snackbar and show success
-          ScaffoldMessenger.of(context).clearSnackBars();
-
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Added ${bookData.title}'),
-                behavior: SnackBarBehavior.floating,
-                backgroundColor: Colors.green,
-                duration: Duration(seconds: 3),
-              ),
-            );
-          }
-        } catch (e) {
-          // Hide loading snackbar and show error
-          ScaffoldMessenger.of(context).clearSnackBars();
-
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Failed to add book: ${e.toString()}'),
-                behavior: SnackBarBehavior.floating,
-                backgroundColor: Colors.red,
-                duration: Duration(seconds: 4),
-              ),
-            );
-          }
-
-          print('Error adding book: $e');
-        }
+      for (final File file in files) {
+        if (!mounted) return;
+        
+        final BookData bookData = await _extractBookData(file);
+        _books.add(bookData);
       }
-    } catch (e) {
-      ScaffoldMessenger.of(context).clearSnackBars();
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error selecting file: ${e.toString()}'),
-            behavior: SnackBarBehavior.floating,
-            backgroundColor: Colors.red,
-            duration: Duration(seconds: 4),
-          ),
-        );
+        setState(() {
+          _isLoading = false;
+        });
       }
-
-      print('Error in _addBook: $e');
+    } catch (e) {
+      debugPrint('Error loading books: $e');
+      if (mounted) {
+        _safeShowErrorSnackBar(context, 'Error loading books: $e');
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
-  void _openBook(File book) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder:
-            (context) => EpubReaderScreen(
-              filePath: book.path,
-              apiService: widget.apiService,
-            ),
+  /// Adds a new book from file picker
+  Future<void> _addBook() async {
+    // Capture context early to avoid accessing it after async operations
+    final BuildContext currentContext = context;
+    
+    try {
+      final FilePickerResult? result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: _allowedExtensions,
+      );
+
+      if (result?.files.single.path == null) return;
+
+      final File sourceFile = File(result!.files.single.path!);
+      final String fileName = sourceFile.uri.pathSegments.last;
+
+      await _processBookFile(sourceFile, fileName, currentContext);
+    } catch (e) {
+      debugPrint('Error in _addBook: $e');
+      // Use the captured context and check if widget is still mounted
+      if (mounted) {
+        _safeShowErrorSnackBar(currentContext, 'Error selecting file: $e');
+      }
+    }
+  }
+
+  /// Processes and saves the selected book file
+  Future<void> _processBookFile(File sourceFile, String fileName, BuildContext currentContext) async {
+    if (!mounted) return;
+
+    _safeClearSnackBars(currentContext);
+    _safeShowLoadingSnackBar(currentContext, 'Adding $fileName...');
+
+    try {
+      final Directory directory = await getApplicationDocumentsDirectory();
+      final Directory booksDir = Directory('${directory.path}/books');
+
+      if (!await booksDir.exists()) {
+        await booksDir.create(recursive: true);
+      }
+
+      final File newFile = await sourceFile.copy('${booksDir.path}/$fileName');
+      final BookData bookData = await _extractBookData(newFile);
+
+      if (mounted) {
+        setState(() {
+          _books.add(bookData);
+        });
+
+        _safeClearSnackBars(currentContext);
+        _safeShowSuccessSnackBar(currentContext, 'Added ${bookData.title}');
+      }
+    } catch (e) {
+      debugPrint('Error adding book: $e');
+      if (mounted) {
+        _safeClearSnackBars(currentContext);
+        _safeShowErrorSnackBar(currentContext, 'Failed to add book: $e');
+      }
+    }
+  }
+
+  /// Opens the selected book in the reader
+  void _openBook(BookData book) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (BuildContext context) => EpubReaderScreen(
+          filePath: book.file.path,
+          apiService: widget.apiService,
+        ),
       ),
     );
   }
 
+  /// Formats filename to a readable title
   String _formatFileName(String fileName) {
-    // Remove file extension and replace underscores with spaces
-    String name = fileName.replaceAll('.epub', '').replaceAll('_', ' ');
+    return fileName
+        .replaceAll('.epub', '')
+        .replaceAll('_', ' ')
+        .split(' ')
+        .map((String word) => word.isNotEmpty
+            ? '${word[0].toUpperCase()}${word.substring(1)}'
+            : word)
+        .join(' ');
+  }
 
-    // Capitalize each word
-    List<String> words = name.split(' ');
-    words =
-        words.map((word) {
-          if (word.isNotEmpty) {
-            return word[0].toUpperCase() + word.substring(1);
-          }
-          return word;
-        }).toList();
+  // Helper methods for SnackBar management with safe context handling
+  void _safeClearSnackBars(BuildContext currentContext) {
+    try {
+      if (mounted && currentContext.mounted) {
+        ScaffoldMessenger.of(currentContext).clearSnackBars();
+      }
+    } catch (e) {
+      debugPrint('Error clearing snackbars: $e');
+    }
+  }
 
-    return words.join(' ');
+  void _safeShowLoadingSnackBar(BuildContext currentContext, String message) {
+    try {
+      if (!mounted || !currentContext.mounted) return;
+      
+      ScaffoldMessenger.of(currentContext).showSnackBar(
+        SnackBar(
+          content: Row(
+            children: [
+              const SizedBox(
+                height: 20,
+                width: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Colors.white,
+                ),
+              ),
+              const SizedBox(width: 20),
+              Expanded(child: Text(message)),
+            ],
+          ),
+          duration: _loadingSnackBarDuration,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (e) {
+      debugPrint('Error showing loading snackbar: $e');
+    }
+  }
+
+  void _safeShowSuccessSnackBar(BuildContext currentContext, String message) {
+    try {
+      if (!mounted || !currentContext.mounted) return;
+      
+      ScaffoldMessenger.of(currentContext).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: Colors.green,
+          duration: _snackBarDuration,
+        ),
+      );
+    } catch (e) {
+      debugPrint('Error showing success snackbar: $e');
+    }
+  }
+
+  void _safeShowErrorSnackBar(BuildContext currentContext, String message) {
+    try {
+      if (!mounted || !currentContext.mounted) return;
+      
+      ScaffoldMessenger.of(currentContext).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          behavior: SnackBarBehavior.floating,
+          backgroundColor: Colors.red,
+          duration: const Duration(seconds: 4),
+        ),
+      );
+    } catch (e) {
+      debugPrint('Error showing error snackbar: $e');
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body:
-          _isLoading
-              ? const LoadingIndicator(message: 'Loading books...')
-              : _books.isEmpty
-              ? EmptyStateWidget(
-                title: 'No Books Found',
-                message:
-                    'Add EPUB books to start reading and learning new vocabulary',
-                icon: Icons.menu_book_outlined,
-                actionLabel: 'Add Book',
-                onActionPressed: _addBook,
-              )
-              : RefreshIndicator(
-                onRefresh: _loadBooks,
-                child: GridView.builder(
-                  padding: const EdgeInsets.all(16.0),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    crossAxisSpacing: 16.0,
-                    mainAxisSpacing: 16.0,
-                    childAspectRatio: 0.75,
-                  ),
-                  itemCount: _books.length,
-                  itemBuilder: (context, index) {
-                    final book = _books[index];
+      body: _buildBody(),
+      floatingActionButton: _buildFloatingActionButton(),
+    );
+  }
 
-                    return GestureDetector(
-                      onTap: () => _openBook(book.file),
-                      child: Card(
-                        elevation: 2,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        clipBehavior: Clip.antiAlias,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            // Book cover
-                            Expanded(
-                              flex: 4,
-                              child:
-                                  book.coverImage != null
-                                      ? Image.memory(
-                                        book.coverImage!,
-                                        fit: BoxFit.cover,
-                                        errorBuilder: (
-                                          context,
-                                          error,
-                                          stackTrace,
-                                        ) {
-                                          print("Error loading image: $error");
-                                          return _buildDefaultCoverImage(
-                                            context,
-                                          );
-                                        },
-                                      )
-                                      : _buildDefaultCoverImage(context),
-                            ),
-                            // Book title
-                            Expanded(
-                              flex: 2,
-                              child: Padding(
-                                padding: const EdgeInsets.all(8.0),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      book.title,
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 14,
-                                      ),
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    const SizedBox(height: 4),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _addBook,
-        backgroundColor: Theme.of(context).colorScheme.primary,
-        foregroundColor: Colors.white,
-        elevation: 4,
-        child: const Icon(Icons.add),
+  Widget _buildBody() {
+    if (_isLoading) {
+      return const LoadingIndicator(message: 'Loading books...');
+    }
+
+    if (_books.isEmpty) {
+      return EmptyStateWidget(
+        title: 'No Books Found',
+        message: 'Add EPUB books to start reading and learning new vocabulary',
+        icon: Icons.menu_book_outlined,
+        actionLabel: 'Add Book',
+        onActionPressed: _addBook,
+      );
+    }
+
+    return _buildBooksGrid();
+  }
+
+  Widget _buildBooksGrid() {
+    return RefreshIndicator(
+      onRefresh: _loadBooks,
+      child: GridView.builder(
+        padding: const EdgeInsets.all(_gridSpacing),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: _gridCrossAxisCount,
+          crossAxisSpacing: _gridSpacing,
+          mainAxisSpacing: _gridSpacing,
+          childAspectRatio: _gridChildAspectRatio,
+        ),
+        itemCount: _books.length,
+        itemBuilder: _buildBookCard,
       ),
     );
   }
 
-  Widget _buildDefaultCoverImage(BuildContext context) {
+  Widget _buildBookCard(BuildContext context, int index) {
+    final BookData book = _books[index];
+
+    return GestureDetector(
+      onTap: () => _openBook(book),
+      child: Card(
+        elevation: 2,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            _buildBookCover(book),
+            _buildBookTitle(book),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBookCover(BookData book) {
+    return Expanded(
+      flex: 4,
+      child: book.coverImage != null
+          ? Image.memory(
+              book.coverImage!,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) {
+                debugPrint('Error loading image: $error');
+                return _buildDefaultCoverImage();
+              },
+            )
+          : _buildDefaultCoverImage(),
+    );
+  }
+
+  Widget _buildBookTitle(BookData book) {
+    return Expanded(
+      flex: 2,
+      child: Padding(
+        padding: const EdgeInsets.all(8.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              book.title,
+              style: const TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 14,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 4),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDefaultCoverImage() {
+    final ColorScheme colorScheme = Theme.of(context).colorScheme;
+    
     return Container(
-      color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+      color: colorScheme.primary.withOpacity(0.1),
       child: Center(
         child: Icon(
           Icons.book,
           size: 50,
-          color: Theme.of(context).colorScheme.primary,
+          color: colorScheme.primary,
         ),
       ),
+    );
+  }
+
+  Widget _buildFloatingActionButton() {
+    final ColorScheme colorScheme = Theme.of(context).colorScheme;
+    
+    return FloatingActionButton(
+      onPressed: _addBook,
+      backgroundColor: colorScheme.primary,
+      foregroundColor: Colors.white,
+      elevation: 4,
+      child: const Icon(Icons.add),
     );
   }
 }
