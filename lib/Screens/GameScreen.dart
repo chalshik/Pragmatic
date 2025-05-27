@@ -34,7 +34,6 @@ class _GameScreenState extends State<GameScreen> {
   String? currentUsername;
   bool readyToStart = false;
   bool isStartingGame = false;
-  bool isWaitingForFirstQuestion = false;
 
   @override
   void initState() {
@@ -44,7 +43,13 @@ class _GameScreenState extends State<GameScreen> {
 
   @override
   void dispose() {
-    _webSocketService.disconnect();
+    // Clean up all subscriptions before disconnecting
+    if (gameCode != null) {
+      _webSocketService.unsubscribeFromPlayerUpdates(gameCode!);
+      _webSocketService.unsubscribeFromGameStatus(gameCode!);
+    }
+    // DON'T disconnect WebSocket as it will be used in GameProcess
+    // _webSocketService.disconnect();
     _createUsernameController.dispose();
     _joinUsernameController.dispose();
     _gameCodeController.dispose();
@@ -164,7 +169,7 @@ class _GameScreenState extends State<GameScreen> {
   }
 
   // Helper method to subscribe to player updates via WebSocket
-  void _subscribeToPlayerUpdates(String code, {bool subscribeToQuestions = true}) {
+  void _subscribeToPlayerUpdates(String code) {
     // Subscribe to player updates
     _webSocketService.subscribeToPlayerUpdates(code, (List<Map<String, dynamic>> playerData) {
       print("Players raw data in room $code updated: $playerData");
@@ -181,45 +186,64 @@ class _GameScreenState extends State<GameScreen> {
         print(stack);
       }
     });
-
-    // Subscribe to question updates for all players (not just the one who starts)
-    if (subscribeToQuestions) {
-      _webSocketService.subscribeToQuestionUpdates(code, (question) {
-        print("Received question in lobby: ${question.question}");
-
-        if (mounted) {
-          setState(() {
-            currentQuestion = question;
-            isWaitingForFirstQuestion = false;
-            isStartingGame = false;
-          });
+    
+    // Subscribe to game status updates for navigation
+    _webSocketService.subscribeToGameStatus(code, (Map<String, dynamic> statusData) {
+      print("Game status received: $statusData");
+      if (mounted) {
+        String? status = statusData['status'];
+        String? message = statusData['message'];
+        
+        if (status == 'STARTING') {
+          if (message != null) {
+            _showSnackBar(message); // "Game will begin in 5 seconds"
+          }
           
-          // Update the provider with the new question
+          // Clear the question provider to ensure clean state
           try {
             if (mounted && context.mounted) {
               final questionProvider = Provider.of<QuestionProvider>(context, listen: false);
-              questionProvider.setQuestion(question);
+              questionProvider.clearQuestion();
             }
           } catch (e) {
-            print("Error setting question in provider: $e");
+            print("Error clearing question in provider: $e");
           }
           
-          // Automatically navigate ALL players to GameProcess when question arrives
-          if (isInLobby && currentUsername != null && gameCode != null) {
-            print("Auto-navigating to GameProcess for user: $currentUsername");
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (context) => GameProcess(
-                  gameRoomCode: gameCode!, 
-                  username: currentUsername!
+          // Subscribe to questions and wait for first question before navigating
+          print("🔔 Subscribing to questions after STARTING status received");
+          _webSocketService.subscribeToQuestionUpdates(code, (Question firstQuestion) {
+            print("📥 First question received in GameScreen: ${firstQuestion.question}");
+            
+            if (mounted) {
+              // Set the question in provider before navigating
+              try {
+                final questionProvider = Provider.of<QuestionProvider>(context, listen: false);
+                questionProvider.setQuestion(firstQuestion);
+                print("✅ First question set in provider before navigation");
+              } catch (e) {
+                print("❌ Error setting first question in provider: $e");
+              }
+              
+              // Now navigate to GameProcess with the question ready
+              print("🎮 Navigating to GameProcess with first question ready");
+              Navigator.pushReplacement(
+                context,
+                PageRouteBuilder(
+                  pageBuilder: (context, animation, secondaryAnimation) => GameProcess(
+                    gameRoomCode: code, 
+                    username: currentUsername!,
+                    webSocketService: _webSocketService,
+                  ),
+                  transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                    return FadeTransition(opacity: animation, child: child);
+                  },
                 ),
-              ),
-            );
-          }
+              );
+            }
+          });
         }
-      });
-    }
+      }
+    });
   }
 
   // Helper method to show snack bar messages
@@ -246,37 +270,19 @@ class _GameScreenState extends State<GameScreen> {
       if (!started) {
         setState(() {
           isStartingGame = false;
-          isWaitingForFirstQuestion = false;
         });
         _showSnackBar("Game could not be started. Please try again.");
         return;
       }
       
-      // Update state to show we're waiting for the first question
-      setState(() {
-        isStartingGame = false;
-        isWaitingForFirstQuestion = true;
-      });
-      
-      // Show loading state while waiting for first question
-      _showSnackBar("Game started! Waiting for first question...");
-      
-      // Set a timeout in case no question is received
-      Timer(const Duration(seconds: 15), () {
-        if (mounted && isWaitingForFirstQuestion) {
-          setState(() {
-            isWaitingForFirstQuestion = false;
-          });
-          _showSnackBar("Timeout waiting for question. Please try again.");
-        }
-      });
+      setState(() => isStartingGame = false);
+      _showSnackBar("Game started! Players will be moved to the game screen shortly.");
       
     } catch (e) {
       print("Error starting game: $e");
       if (mounted) {
         setState(() {
           isStartingGame = false;
-          isWaitingForFirstQuestion = false;
         });
         _showSnackBar("Error starting game: $e");
       }
@@ -292,7 +298,6 @@ class _GameScreenState extends State<GameScreen> {
       currentUsername = null;
       currentQuestion = null;
       readyToStart = false;
-      isWaitingForFirstQuestion = false;
     });
     
     // Clear text controllers
@@ -378,48 +383,14 @@ class _GameScreenState extends State<GameScreen> {
         ),
         const SizedBox(height: 20),
         
-        // Show waiting for question indicator
-        if (isWaitingForFirstQuestion) ...[
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.orange.shade50,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.orange.shade200),
-            ),
-            child: const Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: Colors.orange,
-                  ),
-                ),
-                SizedBox(width: 12),
-                Text(
-                  'Game started! Waiting for first question...',
-                  style: TextStyle(
-                    color: Colors.orange,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 20),
-        ],
-        
         ElevatedButton(
-          onPressed: readyToStart && !isStartingGame && !isWaitingForFirstQuestion ? _startGame : null,
+          onPressed: readyToStart && !isStartingGame ? _startGame : null,
           style: ElevatedButton.styleFrom(
             minimumSize: const Size(double.infinity, 50),
             backgroundColor: readyToStart ? Colors.green : Colors.grey,
             foregroundColor: Colors.white,
           ),
-          child: (isStartingGame || isWaitingForFirstQuestion)
+          child: isStartingGame
               ? const SizedBox(
                   height: 20,
                   width: 20,
@@ -586,6 +557,7 @@ class _GameScreenState extends State<GameScreen> {
               )
             : null,
       ),
+      floatingActionButton: null, // Explicitly disable FAB to prevent Hero conflicts
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20),

@@ -1,6 +1,6 @@
 class Question {
   String question;
-  String answer;
+  int answer;
   List<String> options;
 
   Question({
@@ -13,7 +13,7 @@ class Question {
   factory Question.fromJson(Map<String, dynamic> json) {
     return Question(
       question: json['question'] as String,
-      answer: json['answer'] as String,
+      answer: json['answer'] as int,
       options: List<String>.from(json['options']),
     );
   }

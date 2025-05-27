@@ -8,10 +8,13 @@ import 'package:provider/provider.dart';
 class GameProcess extends StatefulWidget {
   final String username;
   final String gameRoomCode;
+  final WebSocketService webSocketService;
+  
   const GameProcess({
     super.key,
     required this.username,
     required this.gameRoomCode,
+    required this.webSocketService,
   });
 
   @override
@@ -19,71 +22,96 @@ class GameProcess extends StatefulWidget {
 }
 
 class _GameProcessState extends State<GameProcess> {
-  late final WebSocketService webSocketService;
   bool _hasSubmittedAnswer = false;
   bool _isConnecting = false;
   Question? _lastQuestion;
   int _questionCount = 0;
   static const int maxQuestions = 20;
+  late WebSocketService _webSocketService;
 
   @override
   void initState() {
     super.initState();
-    // Reuse the existing WebSocket service instead of creating a new one
-    webSocketService = WebSocketService();
-    _initializeWebSocket();
-    _subscribeToQuestions();
+    _webSocketService = widget.webSocketService;
+    _initializeGameProcess();
   }
 
-  Future<void> _initializeWebSocket() async {
-    setState(() {
-      _isConnecting = true;
-    });
+  void _initializeGameProcess() async {
+    print("🎮 GameProcess: Initializing...");
     
+    // Wait a moment for navigation to complete
+    await Future.delayed(Duration(milliseconds: 500));
+    
+    if (!mounted) return;
+    
+    print("🔌 GameProcess: Checking WebSocket connection...");
+    
+    // Ensure WebSocket is connected
+    if (!_webSocketService.isConnected) {
+      print("❌ GameProcess: WebSocket not connected, attempting to connect...");
+      try {
+        await _webSocketService.connect();
+      } catch (e) {
+        print("❌ GameProcess: Failed to connect WebSocket: $e");
+        return;
+      }
+    }
+    
+    print("✅ GameProcess: WebSocket is connected");
+    
+    // Check if we already have a question from GameScreen
     try {
-      if (!webSocketService.isConnected) {
-        await webSocketService.connect();
-        print("WebSocket connected in GameProcess");
+      final questionProvider = Provider.of<QuestionProvider>(context, listen: false);
+      final currentQuestion = questionProvider.currentQuestion;
+      
+      if (currentQuestion != null) {
+        print("📋 GameProcess: Found existing question from GameScreen: ${currentQuestion.question}");
+        setState(() {
+          _questionCount = 1; // We have the first question
+          _hasSubmittedAnswer = false;
+          _lastQuestion = currentQuestion;
+        });
+        
+        // Continue subscription for subsequent questions
+        print("📞 GameProcess: Continuing subscription for subsequent questions");
+        _webSocketService.subscribeToQuestionUpdates(widget.gameRoomCode, _onQuestionReceived);
       } else {
-        print("WebSocket already connected, reusing connection");
+        print("📞 GameProcess: No existing question, subscribing to questions for game: ${widget.gameRoomCode}");
+        _webSocketService.subscribeToQuestionUpdates(widget.gameRoomCode, _onQuestionReceived);
       }
     } catch (e) {
-      print("Error connecting WebSocket in GameProcess: $e");
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isConnecting = false;
-        });
-      }
+      print("❌ GameProcess: Error checking existing question: $e");
+      // Fallback to normal subscription
+      print("📞 GameProcess: Fallback - subscribing to questions for game: ${widget.gameRoomCode}");
+      _webSocketService.subscribeToQuestionUpdates(widget.gameRoomCode, _onQuestionReceived);
     }
   }
 
-  void _subscribeToQuestions() {
-    // Subscribe to new questions during the game
-    webSocketService.subscribeToQuestionUpdates(widget.gameRoomCode, (question) {
-      print("Received new question in GameProcess: ${question.question}");
+  void _onQuestionReceived(Question question) {
+    print("📥 Received new question in GameProcess: ${question.question}");
+    
+    if (mounted) {
+      setState(() {
+        _questionCount++;
+        _hasSubmittedAnswer = false; // Reset for new question
+        _lastQuestion = question;
+      });
       
-      if (mounted) {
-        setState(() {
-          _questionCount++;
-          _hasSubmittedAnswer = false; // Reset for new question
-          _lastQuestion = question;
-        });
-        
-        // Update the provider with the new question
-        try {
-          final questionProvider = Provider.of<QuestionProvider>(context, listen: false);
-          questionProvider.setQuestion(question);
-        } catch (e) {
-          print("Error setting question in provider: $e");
-        }
-        
-        // Check if we've reached the maximum number of questions
-        if (_questionCount >= maxQuestions) {
-          _finishGame();
-        }
+      // Update the provider with the new question
+      try {
+        final questionProvider = Provider.of<QuestionProvider>(context, listen: false);
+        questionProvider.setQuestion(question);
+        print("✅ Question set in provider successfully");
+      } catch (e) {
+        print("❌ Error setting question in provider: $e");
       }
-    });
+      
+      // Check if we've reached the maximum number of questions
+      if (_questionCount >= maxQuestions) {
+        print("🎉 Reached max questions, finishing game");
+        _finishGame();
+      }
+    }
   }
 
   void _finishGame() {
@@ -116,18 +144,19 @@ class _GameProcessState extends State<GameProcess> {
 
   @override
   void dispose() {
-    // Don't disconnect here as the GameScreen might still be using it
-    // The WebSocket will be managed by the GameScreen
+    // Unsubscribe from questions when leaving GameProcess
+    _webSocketService.unsubscribeFromQuestions(widget.gameRoomCode);
+    print("🔄 GameProcess unsubscribed from questions on dispose");
     super.dispose();
   }
 
-  void submitAnswer(String option, Question currentQuestion) {
+  void submitAnswer(int index, Question currentQuestion) {
     if (_hasSubmittedAnswer) {
       print("Answer already submitted for this question");
       return;
     }
 
-    if (!webSocketService.isConnected) {
+    if (!_webSocketService.isConnected) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Not connected to server. Please try again.'),
@@ -141,22 +170,21 @@ class _GameProcessState extends State<GameProcess> {
       final answer = {
         "username": widget.username,
         "gameroom": widget.gameRoomCode,
-        "answer": option,
-        "question": currentQuestion.question
+        "index": index,
       };
       
-      webSocketService.sendMessage("/app/game/submit", answer);
+      _webSocketService.sendMessage("/app/game/submit", answer);
       
       setState(() {
         _hasSubmittedAnswer = true;
       });
       
-      print("Selected option: $option");
+      print("Selected option: $index");
       
       // Show confirmation to user
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Answer submitted: $option'),
+          content: Text('Answer submitted: $index'),
           duration: const Duration(seconds: 2),
           backgroundColor: Colors.green,
         ),
@@ -176,16 +204,32 @@ class _GameProcessState extends State<GameProcess> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Question ${_questionCount}/$maxQuestions'),
+        title: Text('Question ${_questionCount > 0 ? _questionCount : 1}/$maxQuestions'),
         centerTitle: true,
         backgroundColor: Theme.of(context).colorScheme.primary,
         foregroundColor: Colors.white,
+        automaticallyImplyLeading: false, // Prevent back button Hero conflict
       ),
+      floatingActionButton: null, // Explicitly disable FAB to prevent Hero conflicts
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Consumer<QuestionProvider>(
           builder: (context, questionProvider, child) {
             final currentQuestion = questionProvider.currentQuestion;
+            
+            // Add safety check for context and provider
+            if (questionProvider == null) {
+              return const Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircularProgressIndicator(),
+                    SizedBox(height: 16),
+                    Text('Loading game state...'),
+                  ],
+                ),
+              );
+            }
             
             return SingleChildScrollView(
               child: Column(
@@ -265,7 +309,7 @@ class _GameProcessState extends State<GameProcess> {
                     child: Text(
                       currentQuestion != null 
                           ? currentQuestion.question 
-                          : "Waiting for question...",
+                          : "Waiting for first question...",
                       style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w500,
@@ -299,7 +343,7 @@ class _GameProcessState extends State<GameProcess> {
                           child: BlockButton(
                             text: option,
                             onPressed: (_hasSubmittedAnswer || _isConnecting) ? null : () {
-                              submitAnswer(option, currentQuestion);
+                              submitAnswer(index, currentQuestion);
                             },
                           ),
                         ),
@@ -342,7 +386,7 @@ class _GameProcessState extends State<GameProcess> {
                           CircularProgressIndicator(),
                           SizedBox(height: 16),
                           Text(
-                            'Loading question...',
+                            'Waiting for first question...',
                             style: TextStyle(fontSize: 16),
                           ),
                         ],
