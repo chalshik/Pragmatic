@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:pragmatic/Models/Question.dart';
 import 'package:pragmatic/Providers/QuestionProvider.dart';
 import 'firebase_options.dart';
 import 'package:pragmatic/Services/AuthService.dart';

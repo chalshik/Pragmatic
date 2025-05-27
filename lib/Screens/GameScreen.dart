@@ -5,7 +5,6 @@ import 'package:pragmatic/Screens/GameProcess.dart';
 import 'package:pragmatic/Services/ApiService.dart';
 import 'package:pragmatic/Services/WebSocketService.dart';
 import 'package:provider/provider.dart';
-import 'dart:async';
 
 class GameScreen extends StatefulWidget {
   const GameScreen({super.key});
@@ -47,6 +46,7 @@ class _GameScreenState extends State<GameScreen> {
     if (gameCode != null) {
       _webSocketService.unsubscribeFromPlayerUpdates(gameCode!);
       _webSocketService.unsubscribeFromGameStatus(gameCode!);
+      _webSocketService.unsubscribeFromGameEnd(gameCode!);
     }
     // DON'T disconnect WebSocket as it will be used in GameProcess
     // _webSocketService.disconnect();
@@ -187,6 +187,16 @@ class _GameScreenState extends State<GameScreen> {
       }
     });
     
+    // Subscribe to game end events early to not miss them
+    print("🏁 GameScreen: Subscribing to game end events for $code");
+    _webSocketService.subscribeToGameEnd(code, (Map<String, dynamic> gameEndData) {
+      print("🏆 Game end received in GameScreen: $gameEndData");
+      if (mounted) {
+        // If we're still in GameScreen when game ends, show results here
+        _showGameEndDialog(gameEndData);
+      }
+    });
+    
     // Subscribe to game status updates for navigation
     _webSocketService.subscribeToGameStatus(code, (Map<String, dynamic> statusData) {
       print("Game status received: $statusData");
@@ -211,7 +221,7 @@ class _GameScreenState extends State<GameScreen> {
           
           // Subscribe to questions and wait for first question before navigating
           print("🔔 Subscribing to questions after STARTING status received");
-          _webSocketService.subscribeToQuestionUpdates(code, (Question firstQuestion) {
+          _webSocketService.subscribeToQuestionUpdates(code, (Question firstQuestion) async {
             print("📥 First question received in GameScreen: ${firstQuestion.question}");
             
             if (mounted) {
@@ -226,19 +236,24 @@ class _GameScreenState extends State<GameScreen> {
               
               // Now navigate to GameProcess with the question ready
               print("🎮 Navigating to GameProcess with first question ready");
-              Navigator.pushReplacement(
-                context,
-                PageRouteBuilder(
-                  pageBuilder: (context, animation, secondaryAnimation) => GameProcess(
-                    gameRoomCode: code, 
-                    username: currentUsername!,
-                    webSocketService: _webSocketService,
+              
+              // Add a small delay to prevent Hero widget conflicts
+              await Future.delayed(const Duration(milliseconds: 100));
+              
+              if (mounted) {
+                Navigator.pushAndRemoveUntil(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => GameProcess(
+                      gameRoomCode: code, 
+                      username: currentUsername!,
+                      webSocketService: _webSocketService,
+                    ),
+                    settings: const RouteSettings(name: '/game-process'),
                   ),
-                  transitionsBuilder: (context, animation, secondaryAnimation, child) {
-                    return FadeTransition(opacity: animation, child: child);
-                  },
-                ),
-              );
+                  (route) => false, // Remove all previous routes
+                );
+              }
             }
           });
         }
@@ -252,6 +267,118 @@ class _GameScreenState extends State<GameScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(message))
       );
+    }
+  }
+
+  // Helper method to show game end dialog with scores
+  void _showGameEndDialog(Map<String, dynamic> gameEndData) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        return WillPopScope(
+          onWillPop: () async => false,
+          child: AlertDialog(
+            title: const Text('🏆 Game Completed!'),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    'Final Scores:',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 16),
+                  _buildScoresList(gameEndData),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).pop(); // Close dialog
+                  Navigator.of(context).pushNamedAndRemoveUntil(
+                    '/home',
+                    (route) => false,
+                  );
+                },
+                child: const Text('Return to Home'),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // Helper method to build scores list
+  Widget _buildScoresList(Map<String, dynamic> gameEndData) {
+    try {
+      // Parse scores from the game end data
+      // The server returns a Map where key is player name and value is score
+      Map<String, dynamic> scoresMap = gameEndData;
+      
+      if (scoresMap.isEmpty) {
+        return const Text('No scores available');
+      }
+      
+      // Convert map to list of entries for sorting
+      List<MapEntry<String, dynamic>> scoreEntries = scoresMap.entries.toList();
+      
+      // Sort scores in descending order
+      scoreEntries.sort((a, b) {
+        int scoreA = (a.value is int) ? a.value : (a.value as num).toInt();
+        int scoreB = (b.value is int) ? b.value : (b.value as num).toInt();
+        return scoreB.compareTo(scoreA);
+      });
+      
+      return Column(
+        children: scoreEntries.asMap().entries.map((entry) {
+          int index = entry.key;
+          String username = entry.value.key;
+          int score = (entry.value.value is int) ? entry.value.value : (entry.value.value as num).toInt();
+          bool isCurrentUser = username == currentUsername;
+          
+          return Container(
+            margin: const EdgeInsets.symmetric(vertical: 4),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: isCurrentUser ? Colors.blue.shade100 : Colors.grey.shade100,
+              borderRadius: BorderRadius.circular(8),
+              border: isCurrentUser ? Border.all(color: Colors.blue, width: 2) : null,
+            ),
+            child: Row(
+              children: [
+                Text(
+                  '${index + 1}.',
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    username,
+                    style: TextStyle(
+                      fontWeight: isCurrentUser ? FontWeight.bold : FontWeight.normal,
+                      fontSize: 16,
+                    ),
+                  ),
+                ),
+                Text(
+                  '$score pts',
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+                if (isCurrentUser) ...[
+                  const SizedBox(width: 8),
+                  const Text('(You)', style: TextStyle(color: Colors.blue)),
+                ],
+              ],
+            ),
+          );
+        }).toList(),
+      );
+    } catch (e) {
+      print("❌ Error building scores list in GameScreen: $e");
+      return Text('Error displaying scores: $e');
     }
   }
 

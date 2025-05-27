@@ -3,7 +3,6 @@ import 'package:pragmatic/Models/Card.dart' as anki;
 import 'package:pragmatic/Services/ApiService.dart';
 import 'package:pragmatic/Models/ReviewRequest.dart';
 import 'package:pragmatic/Models/Review.dart';
-import 'package:pragmatic/Screens/DeckSelectionDialog.dart';
 
 class CardReviewScreen extends StatefulWidget {
   final int deckId;

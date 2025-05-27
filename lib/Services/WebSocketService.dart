@@ -261,9 +261,69 @@ class WebSocketService {
     }
   }
 
+  void subscribeToGameEnd(String gameCode, Function(Map<String, dynamic>) onGameEnd) {
+    final destination = "/topic/game/$gameCode/end";
+    
+    print("🏁 [DEBUG] Attempting to subscribe to game end:");
+    print("🏁 [DEBUG] - Destination: $destination");
+    print("🏁 [DEBUG] - WebSocket connected: $_isConnected");
+    
+    // Unsubscribe from any existing game end subscription first
+    unsubscribeFromGameEnd(gameCode);
+
+    if (_isConnected) {
+      print("🏁 Setting up game end subscription for: $destination");
+      try {
+        final subscription = _stompClient.subscribe(
+          destination: destination,
+          callback: (frame) {
+            print("🏆 Raw frame received on $destination");
+            print("🏆 Frame headers: ${frame.headers}");
+            print("🏆 Frame body: ${frame.body}");
+            
+            if (frame.body != null) {
+              try {
+                final data = jsonDecode(frame.body!);
+                print("✅ Game end data parsed successfully: $data");
+                onGameEnd(data);
+                print("✅ Game end callback executed successfully");
+              } catch (e, stackTrace) {
+                print("❌ Error parsing game end data: $e");
+                print("❌ Stack trace: $stackTrace");
+                print("❌ Raw body that failed: ${frame.body}");
+              }
+            } else {
+              print("⚠️ Received frame with empty body on $destination");
+            }
+          },
+        );
+        _activeSubscriptions[destination] = subscription;
+        print("✅ Successfully subscribed to game end: $destination");
+        print("✅ [DEBUG] Active subscriptions after adding: ${_activeSubscriptions.keys.toList()}");
+      } catch (e, stackTrace) {
+        print("❌ Failed to subscribe to game end: $e");
+        print("❌ Stack trace: $stackTrace");
+      }
+    } else {
+      print("❌ Cannot subscribe to game end - WebSocket not connected");
+      print("❌ [DEBUG] Connection state: $_isConnected");
+      print("❌ [DEBUG] StompClient state: ${_stompClient.connected}");
+    }
+  }
+
+  void unsubscribeFromGameEnd(String gameCode) {
+    final destination = "/topic/game/$gameCode/end";
+    if (_activeSubscriptions.containsKey(destination)) {
+      _activeSubscriptions[destination]?.call();
+      _activeSubscriptions.remove(destination);
+      _subscriptionCallbacks.remove(destination);
+      print("🔄 Unsubscribed from game end: $destination");
+    }
+  }
+
   void unsubscribeAll() {
     _activeSubscriptions.forEach((destination, subscription) {
-      subscription?.call();
+      subscription.call();
       print("🔄 Unsubscribed from: $destination");
     });
     _activeSubscriptions.clear();

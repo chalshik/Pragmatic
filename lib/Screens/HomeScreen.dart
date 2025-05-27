@@ -148,7 +148,7 @@ class _HomeScreenState extends State<HomeScreen> {
     
     return AuthWrapper(
       child: Scaffold(
-        backgroundColor: theme.colorScheme.background,
+        backgroundColor: theme.colorScheme.surface,
         appBar: _buildAppBar(theme),
         body: IndexedStack(
           index: _currentIndex,
@@ -163,8 +163,8 @@ class _HomeScreenState extends State<HomeScreen> {
     return AppBar(
       title: Text(_titles[_currentIndex]),
       elevation: 0,
-      backgroundColor: theme.colorScheme.background,
-      foregroundColor: theme.colorScheme.onBackground,
+      backgroundColor: theme.colorScheme.surface,
+      foregroundColor: theme.colorScheme.onSurface,
       actions: [
         _buildLogoutButton(),
       ],

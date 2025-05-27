@@ -23,10 +23,9 @@ class GameProcess extends StatefulWidget {
 
 class _GameProcessState extends State<GameProcess> {
   bool _hasSubmittedAnswer = false;
-  bool _isConnecting = false;
+  final bool _isConnecting = false;
   Question? _lastQuestion;
   int _questionCount = 0;
-  static const int maxQuestions = 20;
   late WebSocketService _webSocketService;
 
   @override
@@ -58,6 +57,10 @@ class _GameProcessState extends State<GameProcess> {
     }
     
     print("✅ GameProcess: WebSocket is connected");
+    
+    // Subscribe to game end events
+    print("🏁 GameProcess: Subscribing to game end events");
+    _webSocketService.subscribeToGameEnd(widget.gameRoomCode, _onGameEnd);
     
     // Check if we already have a question from GameScreen
     try {
@@ -106,47 +109,136 @@ class _GameProcessState extends State<GameProcess> {
         print("❌ Error setting question in provider: $e");
       }
       
-      // Check if we've reached the maximum number of questions
-      if (_questionCount >= maxQuestions) {
-        print("🎉 Reached max questions, finishing game");
-        _finishGame();
-      }
+      // Don't force finish the game - let the server handle game end
+      print("📋 Question $_questionCount received, waiting for next question or game end from server");
     }
   }
 
-  void _finishGame() {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (BuildContext context) {
-        return WillPopScope(
-          onWillPop: () async => false,
-          child: AlertDialog(
-            title: const Text('Game Complete!'),
-            content: const Text('You have completed all 20 questions. Thank you for playing!'),
-            actions: [
-              TextButton(
-                onPressed: () {
-                  Navigator.of(context).pop(); // Close dialog
-                  Navigator.of(context).pushNamedAndRemoveUntil(
-                    '/home',
-                    (route) => false,
-                  );
-                },
-                child: const Text('Return to Home'),
+  void _onGameEnd(Map<String, dynamic> gameEndData) {
+    print("🏆 [GameProcess] Game ended! Received scores: $gameEndData");
+    print("🏆 [GameProcess] gameEndData type: ${gameEndData.runtimeType}");
+    print("🏆 [GameProcess] gameEndData keys: ${gameEndData.keys.toList()}");
+    
+    if (mounted) {
+      // Show game end dialog with scores
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext context) {
+          return WillPopScope(
+            onWillPop: () async => false,
+            child: AlertDialog(
+              title: const Text('🏆 Game Completed!'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text(
+                      'Final Scores:',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 16),
+                    _buildScoresList(gameEndData),
+                  ],
+                ),
               ),
-            ],
-          ),
-        );
-      },
-    );
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop(); // Close dialog
+                    Navigator.of(context).pushNamedAndRemoveUntil(
+                      '/home',
+                      (route) => false,
+                    );
+                  },
+                  child: const Text('Return to Home'),
+                ),
+              ],
+            ),
+          );
+        },
+      );
+    } else {
+      print("🏆 [GameProcess] Widget not mounted, cannot show dialog");
+    }
+  }
+
+  Widget _buildScoresList(Map<String, dynamic> gameEndData) {
+    try {
+      // Parse scores from the game end data
+      // The server returns a Map where key is player name and value is score
+      Map<String, dynamic> scoresMap = gameEndData;
+      
+      if (scoresMap.isEmpty) {
+        return const Text('No scores available');
+      }
+      
+      // Convert map to list of entries for sorting
+      List<MapEntry<String, dynamic>> scoreEntries = scoresMap.entries.toList();
+      
+      // Sort scores in descending order
+      scoreEntries.sort((a, b) {
+        int scoreA = (a.value is int) ? a.value : (a.value as num).toInt();
+        int scoreB = (b.value is int) ? b.value : (b.value as num).toInt();
+        return scoreB.compareTo(scoreA);
+      });
+      
+      return Column(
+        children: scoreEntries.asMap().entries.map((entry) {
+          int index = entry.key;
+          String username = entry.value.key;
+          int score = (entry.value.value is int) ? entry.value.value : (entry.value.value as num).toInt();
+          bool isCurrentUser = username == widget.username;
+          
+          return Container(
+            margin: const EdgeInsets.symmetric(vertical: 4),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: isCurrentUser ? Colors.blue.shade100 : Colors.grey.shade100,
+              borderRadius: BorderRadius.circular(8),
+              border: isCurrentUser ? Border.all(color: Colors.blue, width: 2) : null,
+            ),
+            child: Row(
+              children: [
+                Text(
+                  '${index + 1}.',
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    username,
+                    style: TextStyle(
+                      fontWeight: isCurrentUser ? FontWeight.bold : FontWeight.normal,
+                      fontSize: 16,
+                    ),
+                  ),
+                ),
+                Text(
+                  '$score pts',
+                  style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+                if (isCurrentUser) ...[
+                  const SizedBox(width: 8),
+                  const Text('(You)', style: TextStyle(color: Colors.blue)),
+                ],
+              ],
+            ),
+          );
+        }).toList(),
+      );
+    } catch (e) {
+      print("❌ Error building scores list: $e");
+      return Text('Error displaying scores: $e');
+    }
   }
 
   @override
   void dispose() {
-    // Unsubscribe from questions when leaving GameProcess
+    // Unsubscribe from questions and game end when leaving GameProcess
     _webSocketService.unsubscribeFromQuestions(widget.gameRoomCode);
-    print("🔄 GameProcess unsubscribed from questions on dispose");
+    _webSocketService.unsubscribeFromGameEnd(widget.gameRoomCode);
+    print("🔄 GameProcess unsubscribed from questions and game end on dispose");
     super.dispose();
   }
 
@@ -173,13 +265,20 @@ class _GameProcessState extends State<GameProcess> {
         "index": index,
       };
       
+      print("🎯 [DEBUG] Submitting answer:");
+      print("🎯 [DEBUG] - Username: ${widget.username}");
+      print("🎯 [DEBUG] - Game room: ${widget.gameRoomCode}");
+      print("🎯 [DEBUG] - Selected index: $index");
+      print("🎯 [DEBUG] - Question count: $_questionCount");
+      print("🎯 [DEBUG] - Answer payload: $answer");
+      
       _webSocketService.sendMessage("/app/game/submit", answer);
       
       setState(() {
         _hasSubmittedAnswer = true;
       });
       
-      print("Selected option: $index");
+      print("✅ Answer submitted successfully: $index");
       
       // Show confirmation to user
       ScaffoldMessenger.of(context).showSnackBar(
@@ -190,7 +289,7 @@ class _GameProcessState extends State<GameProcess> {
         ),
       );
     } catch (e) {
-      print("Error submitting answer: $e");
+      print("❌ Error submitting answer: $e");
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Failed to submit answer: $e'),
@@ -204,7 +303,7 @@ class _GameProcessState extends State<GameProcess> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Question ${_questionCount > 0 ? _questionCount : 1}/$maxQuestions'),
+        title: Text('Question ${_questionCount > 0 ? _questionCount : 1}'),
         centerTitle: true,
         backgroundColor: Theme.of(context).colorScheme.primary,
         foregroundColor: Colors.white,
@@ -217,27 +316,13 @@ class _GameProcessState extends State<GameProcess> {
           builder: (context, questionProvider, child) {
             final currentQuestion = questionProvider.currentQuestion;
             
-            // Add safety check for context and provider
-            if (questionProvider == null) {
-              return const Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    CircularProgressIndicator(),
-                    SizedBox(height: 16),
-                    Text('Loading game state...'),
-                  ],
-                ),
-              );
-            }
-            
             return SingleChildScrollView(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   const SizedBox(height: 20),
                   
-                  // Progress indicator
+                  // Game info indicator
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(16),
@@ -249,7 +334,7 @@ class _GameProcessState extends State<GameProcess> {
                     child: Column(
                       children: [
                         Text(
-                          'Question ${_questionCount} of $maxQuestions',
+                          'Question $_questionCount',
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
@@ -257,11 +342,11 @@ class _GameProcessState extends State<GameProcess> {
                           ),
                         ),
                         const SizedBox(height: 8),
-                        LinearProgressIndicator(
-                          value: _questionCount / maxQuestions,
-                          backgroundColor: Colors.grey.shade300,
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            Theme.of(context).colorScheme.primary,
+                        Text(
+                          'Game Code: ${widget.gameRoomCode}',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Theme.of(context).colorScheme.primary.withOpacity(0.7),
                           ),
                         ),
                       ],
@@ -348,7 +433,7 @@ class _GameProcessState extends State<GameProcess> {
                           ),
                         ),
                       );
-                    }).toList(),
+                    }),
                     
                     if (_hasSubmittedAnswer) ...[
                       const SizedBox(height: 20),
@@ -393,8 +478,6 @@ class _GameProcessState extends State<GameProcess> {
                       ),
                     ),
                   ],
-                  
-                  const SizedBox(height: 20),
                 ],
               ),
             );
