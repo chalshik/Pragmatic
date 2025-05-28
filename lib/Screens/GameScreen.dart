@@ -224,36 +224,50 @@ class _GameScreenState extends State<GameScreen> {
           _webSocketService.subscribeToQuestionUpdates(code, (Question firstQuestion) async {
             print("📥 First question received in GameScreen: ${firstQuestion.question}");
             
-            if (mounted) {
-              // Set the question in provider before navigating
+            if (!mounted || !context.mounted) {
+              print("⚠️ Widget not mounted, skipping navigation");
+              return;
+            }
+            
+            // Set the question in provider before navigating
+            try {
+              final questionProvider = Provider.of<QuestionProvider>(context, listen: false);
+              questionProvider.setQuestion(firstQuestion);
+              print("✅ First question set in provider before navigation");
+            } catch (e) {
+              print("❌ Error setting first question in provider: $e");
+              return;
+            }
+            
+            // Now navigate to GameProcess with the question ready
+            print("🎮 Navigating to GameProcess with first question ready");
+            
+            // Add a small delay to prevent Hero widget conflicts
+            await Future.delayed(const Duration(milliseconds: 200));
+            
+            if (mounted && context.mounted) {
               try {
-                final questionProvider = Provider.of<QuestionProvider>(context, listen: false);
-                questionProvider.setQuestion(firstQuestion);
-                print("✅ First question set in provider before navigation");
-              } catch (e) {
-                print("❌ Error setting first question in provider: $e");
-              }
-              
-              // Now navigate to GameProcess with the question ready
-              print("🎮 Navigating to GameProcess with first question ready");
-              
-              // Add a small delay to prevent Hero widget conflicts
-              await Future.delayed(const Duration(milliseconds: 100));
-              
-              if (mounted) {
-                Navigator.pushAndRemoveUntil(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => GameProcess(
+                // Use pushReplacement with explicit Hero tag handling
+                Navigator.of(context).pushReplacement(
+                  PageRouteBuilder(
+                    pageBuilder: (context, animation, secondaryAnimation) => GameProcess(
                       gameRoomCode: code, 
                       username: currentUsername!,
                       webSocketService: _webSocketService,
                     ),
+                    transitionDuration: const Duration(milliseconds: 300),
+                    transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                      return FadeTransition(opacity: animation, child: child);
+                    },
                     settings: const RouteSettings(name: '/game-process'),
                   ),
-                  (route) => false, // Remove all previous routes
                 );
+                print("✅ Navigation to GameProcess completed");
+              } catch (e) {
+                print("❌ Error during navigation: $e");
               }
+            } else {
+              print("⚠️ Context no longer mounted, navigation cancelled");
             }
           });
         }
@@ -684,7 +698,8 @@ class _GameScreenState extends State<GameScreen> {
               )
             : null,
       ),
-      floatingActionButton: null, // Explicitly disable FAB to prevent Hero conflicts
+      // Explicitly disable FAB to prevent Hero conflicts during navigation
+      floatingActionButton: null,
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
