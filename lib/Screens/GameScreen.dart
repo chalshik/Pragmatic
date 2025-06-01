@@ -4,6 +4,7 @@ import 'package:pragmatic/Providers/QuestionProvider.dart';
 import 'package:pragmatic/Screens/GameProcess.dart';
 import 'package:pragmatic/Services/ApiService.dart';
 import 'package:pragmatic/Services/WebSocketService.dart';
+import 'package:pragmatic/Services/QrCodeService.dart';
 import 'package:provider/provider.dart';
 
 class GameScreen extends StatefulWidget {
@@ -13,7 +14,7 @@ class GameScreen extends StatefulWidget {
   State<GameScreen> createState() => _GameScreenState();
 }
 
-class _GameScreenState extends State<GameScreen> {
+class _GameScreenState extends State<GameScreen> with SingleTickerProviderStateMixin {
   // Controllers
   final TextEditingController _createUsernameController = TextEditingController();
   final TextEditingController _joinUsernameController = TextEditingController();
@@ -22,6 +23,9 @@ class _GameScreenState extends State<GameScreen> {
   // Services
   final WebSocketService _webSocketService = WebSocketService();
   final ApiService _apiService = ApiService();
+  
+  // Tab Controller
+  late TabController _tabController;
   
   // State variables
   Question? currentQuestion;
@@ -37,6 +41,7 @@ class _GameScreenState extends State<GameScreen> {
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 2, vsync: this);
     _webSocketService.connect();
   }
 
@@ -46,10 +51,13 @@ class _GameScreenState extends State<GameScreen> {
     if (gameCode != null) {
       _webSocketService.unsubscribeFromPlayerUpdates(gameCode!);
       _webSocketService.unsubscribeFromGameStatus(gameCode!);
-      _webSocketService.unsubscribeFromGameEnd(gameCode!);
+      // DON'T unsubscribe from game end events - let GameProcess handle this
+      // to ensure continuous subscription without gaps
+      // _webSocketService.unsubscribeFromGameEnd(gameCode!);
     }
     // DON'T disconnect WebSocket as it will be used in GameProcess
     // _webSocketService.disconnect();
+    _tabController.dispose();
     _createUsernameController.dispose();
     _joinUsernameController.dispose();
     _gameCodeController.dispose();
@@ -328,12 +336,84 @@ class _GameScreenState extends State<GameScreen> {
   // Helper method to build scores list
   Widget _buildScoresList(Map<String, dynamic> gameEndData) {
     try {
+      print("🏆 [DEBUG] Building scores list with data: $gameEndData");
+      
+      // Check if we received the malformed {"g":3} format
+      if (gameEndData.containsKey("g") && gameEndData.length == 1) {
+        print("⚠️ [DEBUG] Received malformed game end data: $gameEndData");
+        return Column(
+          children: [
+            const Icon(
+              Icons.warning_amber_rounded,
+              color: Colors.orange,
+              size: 48,
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Game completed, but scores are not available.',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Server sent: $gameEndData',
+              style: const TextStyle(fontSize: 12, color: Colors.grey),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'This appears to be a server-side issue with the scores format.',
+              style: TextStyle(fontSize: 14, color: Colors.grey),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        );
+      }
+      
       // Parse scores from the game end data
       // The server returns a Map where key is player name and value is score
       Map<String, dynamic> scoresMap = gameEndData;
       
       if (scoresMap.isEmpty) {
         return const Text('No scores available');
+      }
+      
+      // Validate that all entries are player name -> score pairs
+      bool hasValidScores = scoresMap.entries.every((entry) {
+        return entry.key is String && 
+               (entry.value is int || entry.value is num) &&
+               entry.key.isNotEmpty;
+      });
+      
+      if (!hasValidScores) {
+        print("⚠️ [DEBUG] Invalid scores format detected: $gameEndData");
+        return Column(
+          children: [
+            const Icon(
+              Icons.error_outline,
+              color: Colors.red,
+              size: 48,
+            ),
+            const SizedBox(height: 16),
+            const Text(
+              'Invalid scores format received from server.',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Expected: {"player1": score1, "player2": score2}',
+              style: const TextStyle(fontSize: 12, color: Colors.grey),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Received: $gameEndData',
+              style: const TextStyle(fontSize: 12, color: Colors.grey),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        );
       }
       
       // Convert map to list of entries for sorting
@@ -392,7 +472,27 @@ class _GameScreenState extends State<GameScreen> {
       );
     } catch (e) {
       print("❌ Error building scores list in GameScreen: $e");
-      return Text('Error displaying scores: $e');
+      return Column(
+        children: [
+          const Icon(
+            Icons.error,
+            color: Colors.red,
+            size: 48,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Error displaying scores: $e',
+            style: const TextStyle(fontSize: 14, color: Colors.red),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Raw data: $gameEndData',
+            style: const TextStyle(fontSize: 12, color: Colors.grey),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      );
     }
   }
 
@@ -452,11 +552,6 @@ class _GameScreenState extends State<GameScreen> {
     return Column(
       children: [
         const SizedBox(height: 20),
-        Text(
-          'Game Lobby',
-          style: Theme.of(context).textTheme.headlineMedium,
-        ),
-        const SizedBox(height: 20),
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
@@ -466,15 +561,41 @@ class _GameScreenState extends State<GameScreen> {
           ),
           child: Column(
             children: [
-              Text(
-                'Game Code: $gameCode',
-                style: const TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold
-                ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Expanded(
+                    child: Column(
+                      children: [
+                        Text(
+                          'Game Code: $gameCode',
+                          style: const TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        const Text('Share this code with friends to join'),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    onPressed: () {
+                      QrCodeService.showGameCodeDialog(
+                        context: context,
+                        gameCode: gameCode!,
+                      );
+                    },
+                    icon: const Icon(Icons.qr_code),
+                    iconSize: 32,
+                    tooltip: 'Show QR Code',
+                    style: IconButton.styleFrom(
+                      backgroundColor: Colors.blue.shade100,
+                      foregroundColor: Colors.blue.shade700,
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 8),
-              const Text('Share this code with friends to join'),
             ],
           ),
         ),
@@ -554,132 +675,262 @@ class _GameScreenState extends State<GameScreen> {
 
   // UI for the initial screen with create/join options
   Widget _buildGameSetupScreen() {
+    return Column(
+      children: [
+        const SizedBox(height: 20),
+        
+        // Tab Bar
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.grey.shade100,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: TabBar(
+            controller: _tabController,
+            labelColor: Colors.white,
+            unselectedLabelColor: Colors.grey.shade600,
+            indicator: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              color: Theme.of(context).colorScheme.primary,
+            ),
+            tabs: const [
+              Tab(
+                icon: Icon(Icons.add_circle_outline),
+                text: 'Create Game',
+              ),
+              Tab(
+                icon: Icon(Icons.group_add),
+                text: 'Join Game',
+              ),
+            ],
+          ),
+        ),
+        
+        const SizedBox(height: 20),
+        
+        // Tab Bar View
+        Expanded(
+          child: TabBarView(
+            controller: _tabController,
+            children: [
+              _buildCreateGameTab(),
+              _buildJoinGameTab(),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // Create Game Tab Content
+  Widget _buildCreateGameTab() {
     return SingleChildScrollView(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const SizedBox(height: 20),
-          Text(
-            'Welcome to Game Lobby',
-            style: Theme.of(context).textTheme.headlineMedium,
-          ),
-          const SizedBox(height: 40),
-          
-          // Create Game Section
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.blue.shade50,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.blue.shade200),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Create a New Game',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: _createUsernameController,
-                  decoration: const InputDecoration(
-                    labelText: "Your Username",
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.person),
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.blue.shade200),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.rocket_launch, color: Colors.blue.shade700),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Create New Game',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.blue.shade700,
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-                const SizedBox(height: 16),
-                ElevatedButton(
-                  onPressed: isCreatingGame ? null : onCreateGame,
-                  style: ElevatedButton.styleFrom(
-                    minimumSize: const Size(double.infinity, 50),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Start a new game room and invite friends to join',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.blue.shade600,
+                    ),
                   ),
-                  child: isCreatingGame
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(
-                            color: Colors.white,
-                            strokeWidth: 3,
-                          ),
-                        )
-                      : const Text('Create Game'),
-                ),
-              ],
+                  const SizedBox(height: 20),
+                  TextField(
+                    controller: _createUsernameController,
+                    decoration: const InputDecoration(
+                      labelText: "Your Username",
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.person),
+                      filled: true,
+                      fillColor: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: ElevatedButton(
+                      onPressed: isCreatingGame ? null : onCreateGame,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blue.shade700,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: isCreatingGame
+                          ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 3,
+                              ),
+                            )
+                          : const Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.add_circle),
+                                SizedBox(width: 8),
+                                Text('Create Game Room', style: TextStyle(fontSize: 16)),
+                              ],
+                            ),
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
+          ],
+        ),
+      ),
+    );
+  }
 
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 24),
-            child: Row(
-              children: [
-                Expanded(child: Divider()),
-                Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 16),
-                  child: Text('OR', style: TextStyle(color: Colors.grey)),
-                ),
-                Expanded(child: Divider()),
-              ],
-            ),
-          ),
-
-          // Join Game Section
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.green.shade50,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.green.shade200),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Join an Existing Game',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: _joinUsernameController,
-                  decoration: const InputDecoration(
-                    labelText: "Your Username",
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.person),
+  // Join Game Tab Content
+  Widget _buildJoinGameTab() {
+    return SingleChildScrollView(
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.green.shade50,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.green.shade200),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.group_add, color: Colors.green.shade700),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Join Existing Game',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.green.shade700,
+                        ),
+                      ),
+                    ],
                   ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: _gameCodeController,
-                  decoration: const InputDecoration(
-                    labelText: "Game Code",
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.code),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Enter a game code to join an existing room',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.green.shade600,
+                    ),
                   ),
-                  textCapitalization: TextCapitalization.characters,
-                ),
-                const SizedBox(height: 16),
-                ElevatedButton(
-                  onPressed: isJoiningGame ? null : onJoinGame,
-                  style: ElevatedButton.styleFrom(
-                    minimumSize: const Size(double.infinity, 50),
-                    backgroundColor: Colors.green,
+                  const SizedBox(height: 20),
+                  TextField(
+                    controller: _joinUsernameController,
+                    decoration: const InputDecoration(
+                      labelText: "Your Username",
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.person),
+                      filled: true,
+                      fillColor: Colors.white,
+                    ),
                   ),
-                  child: isJoiningGame
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(
-                            color: Colors.white,
-                            strokeWidth: 3,
-                          ),
-                        )
-                      : const Text('Join Game'),
-                ),
-              ],
+                  const SizedBox(height: 16),
+                  TextField(
+                    controller: _gameCodeController,
+                    decoration: InputDecoration(
+                      labelText: "Game Code",
+                      border: const OutlineInputBorder(),
+                      prefixIcon: const Icon(Icons.code),
+                      suffixIcon: IconButton(
+                        onPressed: () {
+                          QrCodeService.openQrScanner(
+                            context: context,
+                            onQrCodeScanned: (scannedCode) {
+                              setState(() {
+                                _gameCodeController.text = scannedCode.toUpperCase();
+                              });
+                              _showSnackBar("Game code scanned: $scannedCode");
+                            },
+                          );
+                        },
+                        icon: const Icon(Icons.qr_code_scanner),
+                        tooltip: 'Scan QR Code',
+                      ),
+                      filled: true,
+                      fillColor: Colors.white,
+                      hintText: "Enter 6-character code",
+                    ),
+                    textCapitalization: TextCapitalization.characters,
+                    maxLength: 6,
+                  ),
+                  const SizedBox(height: 20),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: ElevatedButton(
+                      onPressed: isJoiningGame ? null : onJoinGame,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.green.shade700,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                      ),
+                      child: isJoiningGame
+                          ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 3,
+                              ),
+                            )
+                          : const Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.login),
+                                SizedBox(width: 8),
+                                Text('Join Game Room', style: TextStyle(fontSize: 16)),
+                              ],
+                            ),
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

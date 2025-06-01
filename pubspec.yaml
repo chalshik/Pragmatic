@@ -50,6 +50,8 @@ dependencies:
   audioplayers: ^6.4.0
   google_fonts: ^6.2.1
   flutter_riverpod: ^2.6.1
+  qr_flutter: ^4.1.0
+  mobile_scanner: ^5.2.3
 
 
 dev_dependencies:

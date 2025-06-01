@@ -268,8 +268,9 @@ class WebSocketService {
     print("🏁 [DEBUG] - Destination: $destination");
     print("🏁 [DEBUG] - WebSocket connected: $_isConnected");
     
-    // Unsubscribe from any existing game end subscription first
-    unsubscribeFromGameEnd(gameCode);
+    // DON'T unsubscribe existing game end subscription to prevent gaps
+    // Multiple subscriptions to the same topic are allowed for reliability
+    // unsubscribeFromGameEnd(gameCode);
 
     if (_isConnected) {
       print("🏁 Setting up game end subscription for: $destination");
@@ -297,8 +298,11 @@ class WebSocketService {
             }
           },
         );
-        _activeSubscriptions[destination] = subscription;
-        print("✅ Successfully subscribed to game end: $destination");
+        
+        // Store subscription with a unique key to allow multiple subscriptions
+        final subscriptionKey = "${destination}_${DateTime.now().millisecondsSinceEpoch}";
+        _activeSubscriptions[subscriptionKey] = subscription;
+        print("✅ Successfully subscribed to game end: $destination with key: $subscriptionKey");
         print("✅ [DEBUG] Active subscriptions after adding: ${_activeSubscriptions.keys.toList()}");
       } catch (e, stackTrace) {
         print("❌ Failed to subscribe to game end: $e");
@@ -313,12 +317,31 @@ class WebSocketService {
 
   void unsubscribeFromGameEnd(String gameCode) {
     final destination = "/topic/game/$gameCode/end";
-    if (_activeSubscriptions.containsKey(destination)) {
-      _activeSubscriptions[destination]?.call();
-      _activeSubscriptions.remove(destination);
-      _subscriptionCallbacks.remove(destination);
-      print("🔄 Unsubscribed from game end: $destination");
+    print("🔄 Attempting to unsubscribe from game end: $destination");
+    
+    // Find all subscriptions for this game end destination
+    final keysToRemove = _activeSubscriptions.keys
+        .where((key) => key.startsWith(destination))
+        .toList();
+    
+    for (final key in keysToRemove) {
+      final subscription = _activeSubscriptions[key];
+      if (subscription != null) {
+        try {
+          subscription(); // Call the function to unsubscribe
+          _activeSubscriptions.remove(key);
+          print("✅ Successfully unsubscribed from game end: $key");
+        } catch (e) {
+          print("❌ Error unsubscribing from game end $key: $e");
+        }
+      }
     }
+    
+    if (keysToRemove.isEmpty) {
+      print("⚠️ No active game end subscriptions found for: $destination");
+    }
+    
+    print("🔄 [DEBUG] Active subscriptions after removal: ${_activeSubscriptions.keys.toList()}");
   }
 
   void unsubscribeAll() {
