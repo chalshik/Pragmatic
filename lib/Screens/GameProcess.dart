@@ -254,8 +254,7 @@ class _GameProcessState extends State<GameProcess> with TickerProviderStateMixin
       
       // Validate that all entries are player name -> score pairs
       bool hasValidScores = scoresMap.entries.every((entry) {
-        return entry.key is String && 
-               (entry.value is int || entry.value is num) &&
+        return (entry.value is int || entry.value is num) &&
                entry.key.isNotEmpty;
       });
       
