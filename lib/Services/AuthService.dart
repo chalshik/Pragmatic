@@ -3,31 +3,37 @@ import 'package:pragmatic/Services/ApiService.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
-  ApiService? _apiService;
+  ApiService? apiService;
 
-  // Create ApiService lazily to avoid circular dependency
-  ApiService get apiService {
-    _apiService ??= ApiService(this);
-    return _apiService!;
+  AuthService();
+
+  // Add a method to safely set the ApiService
+  void setApiService(ApiService service) {
+    apiService = service;
   }
 
   // Add auth state changes stream
   Stream<User?> authStateChanges() => _auth.authStateChanges();
 
   // Sign up with email, password, and optional username
-  Future<User?> signUp(String email, String password, {String? username}) async {
+  Future<User?> signUp(
+    String email,
+    String password, {
+    String? username,
+  }) async {
     try {
-      UserCredential userCredential = await _auth.createUserWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
+      UserCredential userCredential = await _auth
+          .createUserWithEmailAndPassword(email: email, password: password);
 
       User? user = userCredential.user;
 
       // Save username to Firestore if provided
-      if (user != null && username != null && username.isNotEmpty) {
+      if (user != null &&
+          username != null &&
+          username.isNotEmpty &&
+          apiService != null) {
         try {
-          await apiService.registerUser(
+          await apiService!.registerUser(
             firebaseUid: user.uid,
             username: username,
           );
@@ -92,6 +98,8 @@ class AuthService {
   // Get current user UID
   String? getCurrentUserUid() {
     User? user = _auth.currentUser;
+    print("User:");
+    print(user);
     return user?.uid;
   }
 }

@@ -22,19 +22,31 @@ class Review {
   });
 
   factory Review.fromJson(Map<String, dynamic> json) {
-    return Review(
-      id: json['id'],
-      userId: json['userId'],
-      cardId: json['cardId'],
-      reviewDate: DateTime.parse(json['reviewDate']),
-      easeFactor: json['easeFactor'].toDouble(),
-      interval: json['interval'],
-      repetitions: json['repetitions'],
-      lastResult: json['lastResult'] != null ? Rating.values.firstWhere(
-        (e) => e.toString() == 'Rating.${json['lastResult']}'
-      ) : null,
-    );
+  final card = json['card'];
+  final user = json['user'];
+
+  if (json['id'] == null || user == null || card == null ||
+      json['reviewDate'] == null || json['easeFactor'] == null ||
+      json['interval'] == null || json['repetitions'] == null) {
+    throw Exception('Invalid or missing fields in review JSON: $json');
   }
+
+  return Review(
+    id: json['id'],
+    userId: user['id'],                // ✅ nested field
+    cardId: card['id'],                // ✅ nested field
+    reviewDate: DateTime.parse(json['reviewDate']),
+    easeFactor: json['easeFactor'].toDouble(),
+    interval: json['interval'],
+    repetitions: json['repetitions'],
+    lastResult: json['lastResult'] != null
+        ? Rating.values.firstWhere(
+            (e) => e.toString() == 'Rating.${json['lastResult']}',
+            orElse: () => throw Exception('Invalid rating: ${json['lastResult']}'),
+          )
+        : null,
+  );
+}
 
   Map<String, dynamic> toJson() {
     return {

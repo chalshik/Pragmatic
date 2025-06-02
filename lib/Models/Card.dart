@@ -17,15 +17,21 @@ class Card {
     this.bookId,
   });
 
-  factory Card.fromJson(Map<String, dynamic> json) => Card(
+  factory Card.fromJson(Map<String, dynamic> json) {
+  print('🧩 Raw card JSON: $json');
+
+  return Card(
     id: json['id'],
-    deckId: json['deckId'],
-    userId: json['userId'],
+    deckId: json['deck']?['id'], // safely get nested ID
+    userId: json['user']?['id'],
     front: json['front'],
     back: json['back'],
     context: json['context'],
-    bookId: json['bookId'],
+    bookId: json['bookId'], // this is already at top-level
   );
+}
+
+
 
   Map<String, dynamic> toJson() => {
     'id': id,

@@ -14,6 +14,8 @@ class _LoginScreenState extends State<LoginScreen> {
   late AuthService authService;
   String email = '';
   String password = '';
+  bool isLoading = false;
+  bool obscurePassword = true;
 
   @override
   void didChangeDependencies() {
@@ -24,18 +26,50 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: Text('Login'),
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24.0),
         child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+                // App logo or icon
+                Icon(
+                  Icons.book,
+                  size: 80,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
+                const SizedBox(height: 16),
+                
+                // App name
+                Text(
+                  'Pragmatic',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 32,
+                    fontWeight: FontWeight.bold,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                ),
+                
+                // Subtitle
+                Text(
+                  'Your language learning companion',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Colors.grey[600],
+                  ),
+                ),
+                const SizedBox(height: 48),
+                
+                // Email field
             TextField(
               decoration: InputDecoration(
                 labelText: 'Email',
-                border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.email_outlined, color: Colors.grey[600]),
               ),
               keyboardType: TextInputType.emailAddress,
               onChanged: (value) {
@@ -44,36 +78,78 @@ class _LoginScreenState extends State<LoginScreen> {
                 });
               },
             ),
-            SizedBox(height: 16),
+                const SizedBox(height: 16),
+                
+                // Password field
             TextField(
               decoration: InputDecoration(
                 labelText: 'Password',
-                border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.lock_outline, color: Colors.grey[600]),
+                    suffixIcon: IconButton(
+                      icon: Icon(
+                        obscurePassword ? Icons.visibility_off : Icons.visibility,
+                        color: Colors.grey[600],
+                      ),
+                      onPressed: () {
+                        setState(() {
+                          obscurePassword = !obscurePassword;
+                        });
+                      },
+                    ),
               ),
-              obscureText: true,
+                  obscureText: obscurePassword,
               onChanged: (value) {
                 setState(() {
                   password = value;
                 });
               },
             ),
-            SizedBox(height: 24),
+                
+                // Forgot password link
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    onPressed: () {
+                      // Handle forgot password
+                    },
+                    style: TextButton.styleFrom(
+                      minimumSize: Size.zero,
+                      padding: EdgeInsets.symmetric(vertical: 8),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                    child: Text('Forgot Password?'),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                
+                // Login button
             ElevatedButton(
-              onPressed: () async {
+                  onPressed: isLoading 
+                    ? null 
+                    : () async {
                 if (email.isEmpty || password.isEmpty) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('All fields are required')),
+                          SnackBar(
+                            content: Text('All fields are required'),
+                            behavior: SnackBarBehavior.floating,
+                          ),
                   );
                   return;
                 }
 
+                      setState(() {
+                        isLoading = true;
+                      });
+
                 try {
                   User? user = await authService.signIn(email, password);
-                  if (user != null) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('Login successful')),
-                    );
-                    // Navigate to home screen
+                        if (user != null && mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Login successful'),
+                              behavior: SnackBarBehavior.floating,
+                            ),
+                          );
                     Navigator.of(context).pushReplacementNamed('/home');
                   }
                 } on FirebaseAuthException catch (e) {
@@ -87,24 +163,59 @@ class _LoginScreenState extends State<LoginScreen> {
                   } else {
                     errorMessage = 'An error occurred. Please try again.';
                   }
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text(errorMessage)),
-                  );
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(errorMessage),
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
                 } catch (e) {
                   ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('An unexpected error occurred')),
+                          SnackBar(
+                            content: Text('An unexpected error occurred'),
+                            behavior: SnackBarBehavior.floating,
+                          ),
                   );
+                      } finally {
+                        if (mounted) {
+                          setState(() {
+                            isLoading = false;
+                          });
+                        }
                 }
               },
-              child: Text('Login'),
+                  child: isLoading
+                      ? SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : Text('Login'),
+                ),
+                const SizedBox(height: 16),
+                
+                // Register link
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      'Don\'t have an account?',
+                      style: TextStyle(color: Colors.grey[600]),
             ),
             TextButton(
               onPressed: () {
                 Navigator.of(context).pushNamed('/register');
               },
-              child: Text('Don\'t have an account? Register'),
+                      child: Text('Register'),
             ),
           ],
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
